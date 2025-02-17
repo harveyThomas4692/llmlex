@@ -1,0 +1,8 @@
+setup.py
+LLMSR/__init__.py
+LLMSR/llmSR.py
+LLMSR.egg-info/PKG-INFO
+LLMSR.egg-info/SOURCES.txt
+LLMSR.egg-info/dependency_links.txt
+LLMSR.egg-info/requires.txt
+LLMSR.egg-info/top_level.txt

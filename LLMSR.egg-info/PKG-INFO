@@ -1,0 +1,23 @@
+Metadata-Version: 2.2
+Name: LLMSR
+Version: 0.0.1
+Summary: An open source python library for symbolic regression with LLMs
+Author: Thomas R. Harvey
+Author-email: trharvey@mit.edu
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Scientific/Engineering :: Mathematics
+Description-Content-Type: text/markdown
+Requires-Dist: scipy
+Requires-Dist: numpy
+Requires-Dist: tqdm
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: requires-dist
+Dynamic: summary
+
+# LLM_SR
