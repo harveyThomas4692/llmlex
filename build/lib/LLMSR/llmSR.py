@@ -90,7 +90,7 @@ def fit_curve(x, y, curve, largest_entry):
         chi_squared = np.mean((residuals ** 2) / (np.abs(curve(x, *params_opt))+1e-6))
         return params_opt, chi_squared
     except Exception as e:
-        print(e)
+        #print(e)
         return np.array(params_initial), np.inf
     
 def single_call(client, img, x, y, model="openai/gpt-4o-mini",function_list=None, system_prompt=None):
@@ -163,6 +163,7 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
         
         population.sort(key=lambda x: x['score'])
         best_pop = population[-1]
+        populations.append(population)
         print("Best score: ", best_pop['score'])
         print("Best ansatz: ", best_pop['ansatz'])
         print("Best params: ", best_pop['params'])

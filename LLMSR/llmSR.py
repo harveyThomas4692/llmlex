@@ -106,7 +106,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini",function_list=None
             "score": -uncert,
             "ansatz": out[0],
             "Num_params": out[1],
-            "curve": curve,
+            # "curve": curve, This wouldn't run for some reason
             "response": resp,
             "prompt": prompt,
             "function_list": function_list

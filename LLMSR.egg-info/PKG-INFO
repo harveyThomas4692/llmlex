@@ -12,6 +12,7 @@ Description-Content-Type: text/markdown
 Requires-Dist: scipy
 Requires-Dist: numpy
 Requires-Dist: tqdm
+Requires-Dist: openai
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier
