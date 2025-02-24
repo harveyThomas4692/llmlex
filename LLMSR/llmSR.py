@@ -24,7 +24,7 @@ def check_key_limit(client):
     
 def get_prompt(function_list = None):
     if function_list is None:
-        function_list = ["x* params[0] + params[1]"]
+        function_list = ["params[0]"]
     
     prompt = "import numpy as np \n"
     for n in range(len(function_list)):
@@ -35,7 +35,7 @@ def get_prompt(function_list = None):
 
 def call_model(client, model, image, prompt, system_prompt=None):
     if system_prompt is None:
-        system_prompt = "Give an improved ansatz to the list for the image. Follow on from the users text with no explaining. Params can be any length."
+        system_prompt = "Give an improved ansatz to the list for the image. Follow on from the users text with no explaining. Params can be any length. There's some noise in the data, give preference to simpler functions."
 
     response = client.chat.completions.create(
     model=model,
@@ -118,6 +118,26 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
                  temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5,system_prompt=None, elite=False):
     population = []
     populations = []
+    print("Checking constant function")
+    curve = lambda x, *params: params[0] * np.ones(len(x))
+    params, _ = curve_fit(curve, x, y, p0=[1])
+    residuals = y - params[0]*np.ones(len(x))
+    chi_squared = np.mean((residuals ** 2) / (np.abs(curve(x, *params))+1e-6))
+
+    if chi_squared <= exit_condition:
+        print("Constant function is good fit.")
+        populations.append([{
+            "params": params,
+            "score": -chi_squared,
+            "ansatz": "lambda x,*params: params[0] * np.ones(len(x))",
+            "Num_params": 0,
+            "response": None,
+            "prompt": None,
+            "function_list": None
+        }])
+        return populations
+    print("Constant function is not a good fit.")
+
     print("Generating Initial population population")
     for i in tqdm(range(population_size)):
         good = False

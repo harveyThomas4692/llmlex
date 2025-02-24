@@ -24,7 +24,7 @@ def check_key_limit(client):
     
 def get_prompt(function_list = None):
     if function_list is None:
-        function_list = ["x* params[0] + params[1]"]
+        function_list = ["params[0]"]
     
     prompt = "import numpy as np \n"
     for n in range(len(function_list)):
