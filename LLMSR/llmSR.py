@@ -87,7 +87,7 @@ def fit_curve(x, y, curve, largest_entry):
         params_initial = np.ones(largest_entry)
         params_opt, _ = curve_fit(curve, x, y, p0=params_initial)
         residuals = y - curve(x, *params_opt)
-        chi_squared = np.mean((residuals ** 2) / (np.abs(curve(x, *params_opt))+1e-6))
+        chi_squared = np.mean((residuals ** 2) / (np.square(curve(x, *params_opt))+1e-6))
         return params_opt, chi_squared
     except Exception as e:
         #print(e)
@@ -122,10 +122,12 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
     curve = lambda x, *params: params[0] * np.ones(len(x))
     params, _ = curve_fit(curve, x, y, p0=[1])
     residuals = y - params[0]*np.ones(len(x))
-    chi_squared = np.mean((residuals ** 2) / (np.abs(curve(x, *params))+1e-6))
+    chi_squared = np.mean((residuals ** 2) / (np.square(curve(x, *params))+1e-6))
 
     if chi_squared <= exit_condition:
         print("Constant function is good fit.")
+        print("Score: ", -chi_squared)
+        print("Constant: ", params)
         populations.append([{
             "params": params,
             "score": -chi_squared,
@@ -137,6 +139,8 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
         }])
         return populations
     print("Constant function is not a good fit.")
+    print("Score: ", -chi_squared)
+    print("Constant: ", params)
 
     print("Generating Initial population population")
     for i in tqdm(range(population_size)):
