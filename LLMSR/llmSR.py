@@ -9,6 +9,28 @@ from LLMSR.response import extract_ansatz, fun_convert
 import LLMSR.fit as fit
     
 def single_call(client, img, x, y, model="openai/gpt-4o-mini",function_list=None, system_prompt=None):
+    """
+    Executes a single call of to a specified llm-model with given parameters and processes the response.
+    Args:
+        client: The openai client object used to interact with the llm.
+        img: The base64 encoded image to use for the model.
+        x: The x-values for curve fitting.
+        y: The y-values for curve fitting.
+        model (str, optional): The model identifier to be used. Defaults to "openai/gpt-4o-mini".
+        function_list (list, optional): A list of functions to be included in the prompt. Defaults to None.
+        system_prompt (str, optional): A system-level prompt to guide the model's behavior. Defaults to None.
+    Returns:
+        dict: A dictionary containing the following keys:
+            - "params": The parameters resulting from the curve fitting.
+            - "score": The score of the curve fitting.
+            - "ansatz": The ansatz extracted from the model's response.
+            - "Num_params": The number of parameters in the ansatz.
+            - "response": The raw response from the model.
+            - "prompt": The prompt used in the model call.
+            - "function_list": The list of functions included in the prompt.
+        None: If an exception occurs during the process.
+    """
+
     try:
         prompt = get_prompt(function_list)
         resp = call_model(client, model, img, prompt, system_prompt=system_prompt)
@@ -30,7 +52,25 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini",function_list=None
         return None
 
 def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
-                 temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5,system_prompt=None, elite=False):
+                temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5,system_prompt=None, elite=False):
+    """
+        Run a genetic algorithm to fit a model to the given data.
+        Parameters:
+            client (object): The client object to use for API calls.
+            base64_image (str): The base64 encoded image to use for the model.
+            x (array-like): The input data for the model.
+            y (array-like): The target data for the model.
+            population_size (int): The size of the population for the genetic algorithm.
+            num_of_generations (int): The number of generations to run the genetic algorithm.
+            temperature (float, optional): The temperature parameter for the selection process. Default is 1.
+            model (str, optional): The model to use for the API calls. Default is "openai/gpt-4o-mini".
+            exit_condition (float, optional): The exit condition for the genetic algorithm. Default is 1e-5.
+            system_prompt (str, optional): The system prompt to use for the API calls. Default is None.
+            elite (bool, optional): Whether to use elitism in the genetic algorithm. Default is False.
+        Returns:
+            list: A list of populations, where each population is a list of individuals.
+        """
+    
     population = []
     populations = []
     print("Checking constant function")
@@ -140,6 +180,22 @@ def generate_nested_functions(layer_connections):
     return [construct_layer(L, node) for node in layer_connections[L]]
 
 def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3):
+    """
+    Converts a given kan model symbolic representations using llmsr.
+    Parameters:
+        model (object): The kan model.
+        client (object): The openai client object used to access the llm.
+        population (int, optional): The population size for the genetic algorithm. Default is 10.
+        generations (int, optional): The number of generations for the genetic algorithm. Default is 3.
+        temperature (float, optional): The temperature parameter for the genetic algorithm. Default is 0.1.
+        gpt_model (str, optional): The GPT model to use for generating symbolic functions. Default is "openai/gpt-4o-mini".
+        exit_condition (float, optional): The exit condition for the genetic algorithm. Default is 1e-3.
+    Returns:
+    tuple: A tuple containing:
+        - res_fcts (dict): A dictionary mapping layer, input, and output indices to their corresponding symbolic functions.
+        - symb_formula (list): A list of symbolic formulas representing each part of the kan.
+    """
+
     res, res_fcts = 'Sin', {}
     layer_connections = {0: {i: [] for i in range(model.width_in[0])}}
     for l in range(len(model.width_in) - 1):

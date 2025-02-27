@@ -23,4 +23,5 @@ def fit_curve(x, y, curve, largest_entry):
         return params_opt, chi_squared
     except Exception as e:
         print(e)
+        print("Getting another response from LLM")
         return np.array(params_initial), np.inf
