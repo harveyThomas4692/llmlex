@@ -4,10 +4,28 @@ from scipy.optimize import curve_fit
 import requests
 import base64
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import io
 
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
+    
+def generate_base64_image(fig, ax, x, y):
+    ax.clear()  # Clear previous plot
+    ax.plot(x, y, label='data')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.grid(True)
+    ax.legend()
+
+    # Save to buffer
+    buffer = io.BytesIO()
+    fig.savefig(buffer, format='png')
+    buffer.seek(0)  # Reset buffer position
+    base64_image = base64.b64encode(buffer.getvalue()).decode("utf-8") # encode img into buffer
+    buffer.close()  # Close buffer
+    return base64_image
 
 def check_key_limit(client):
     headers = {"Authorization": f"Bearer {client.api_key}",}
@@ -35,7 +53,8 @@ def get_prompt(function_list = None):
 
 def call_model(client, model, image, prompt, system_prompt=None):
     if system_prompt is None:
-        system_prompt = "Give an improved ansatz to the list for the image. Follow on from the users text with no explaining. Params can be any length. There's some noise in the data, give preference to simpler functions."
+        system_prompt = ("Give an improved ansatz to the list for the image. Follow on from the users text with no explaining."
+                         "Params can be any length. There's some noise in the data, give preference to simpler functions.")
 
     response = client.chat.completions.create(
     model=model,
@@ -196,3 +215,71 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
             return populations
         
     return populations
+
+def generate_nested_functions(layer_connections):
+    """
+    Generates a nested function expression for a symbolic computational graph.
+
+    Parameters:
+        layer_connections (dict): A dictionary where keys are layer indices (1 to L),
+                                  and values are lists of nodes in that layer, 
+                                  each containing a list of indices from the previous layer.
+
+    Returns:
+        str: Nested function string.
+    """
+    L = max(layer_connections.keys())
+    def construct_layer(l, node):
+        """Recursively constructs the function for a given node at layer l."""
+        if l == 0:
+            # Base case: Input layer directly maps to x_i
+            return f"f_{{0,{node}}}(x_{node})"
+        else:
+            # Construct sum of incoming connections
+            inputs = " + ".join([f"f_{{{l},{node}}}({construct_layer(l-1, prev)})" 
+                                 for prev in layer_connections[l].get(node, [])])
+            return f"({inputs})" if inputs else f"f_{{{l},{node}}}()"  # Handle empty case
+
+    # Construct output as a list
+    return [construct_layer(L, node) for node in layer_connections[L]]
+
+def to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3):
+    res, res_fcts = 'Sin', {}
+    layer_connections = {0: {i: [] for i in range(model.width_in[0])}}
+    for l in range(len(model.width_in) - 1):
+        layer_connections[l] = {i: list(range(model.width_out[l-1])) if l > 0 else []  for i in range(model.width_in[l])}
+    symb_formula = generate_nested_functions(layer_connections)
+    
+    for l in range(len(model.width_in) - 1):
+        for i in range(model.width_in[l]):
+            for j in range(model.width_out[l + 1]):
+                if (model.symbolic_fun[l].mask[j, i] > 0. and model.act_fun[l].mask[i][j] == 0.):
+                    print(f'skipping ({l},{i},{j}) since already symbolic')
+                    symb_formula = [s.replace(f'f_{{{l},{i},{j}}}', 'TODO') for s in symb_formula]
+                elif (model.symbolic_fun[l].mask[j, i] == 0. and model.act_fun[l].mask[i][j] == 0.):
+                    model.fix_symbolic(l, i, j, '0', verbose=verbose > 1, log_history=False)
+                    print(f'fixing ({l},{i},{j}) with 0')
+                    symb_formula = [s.replace(f'f_{{{l},{i},{j}}}', '0') for s in symb_formula]
+                    res_fcts[(l, i, j)] = None
+                else:
+                    x_min, x_max, y_min, y_max = model.get_range(l, i, j, verbose=False)
+                    x, y = model.acts[l][:, i].cpu().detach().numpy(), model.spline_postacts[l][:, j, i].cpu().detach().numpy()
+                    ordered_in = np.argsort(x)
+                    x, y = x[ordered_in], y[ordered_in]
+                    fig, ax = plt.subplots()
+                    plt.xticks([x_min, x_max], ['%2.f' % x_min, '%2.f' % x_max])
+                    plt.yticks([y_min, y_max], ['%2.f' % y_min, '%2.f' % y_max])
+                    base64_image = generate_base64_image(fig, ax, x, y)
+                    print((l,i,j))
+                    plt.show()
+                    mask = model.act_fun[l].mask
+                    try:
+                        res = run_genetic(client, base64_image, x, y, population, generations, temperature=temperature, model=gpt_model, system_prompt=None, elite=False, exit_condition=exit_condition)
+                        res_fcts[(l,i,j)] = res
+                        # symb_formula = [s.replace(f'f_{{{l},{i}}}', res) for s in symb_formula]
+                    except Exception as e:
+                        print(e)
+                        res_fcts[(l,i,j)] = None
+    ax.clear()
+    plt.close()
+    return res_fcts, symb_formula

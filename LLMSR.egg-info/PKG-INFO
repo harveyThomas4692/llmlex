@@ -13,6 +13,7 @@ Requires-Dist: scipy
 Requires-Dist: numpy
 Requires-Dist: tqdm
 Requires-Dist: openai
+Requires-Dist: matplotlib
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier
