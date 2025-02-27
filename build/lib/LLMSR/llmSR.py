@@ -1,116 +1,12 @@
 import numpy as np
-import re
 from scipy.optimize import curve_fit
-import requests
-import base64
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import io
+from LLMSR.images import generate_base64_image
+from LLMSR.llm import get_prompt, call_model
+from LLMSR.response import extract_ansatz, fun_convert
 
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
-    
-def generate_base64_image(fig, ax, x, y):
-    ax.clear()  # Clear previous plot
-    ax.plot(x, y, label='data')
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.grid(True)
-    ax.legend()
-
-    # Save to buffer
-    buffer = io.BytesIO()
-    fig.savefig(buffer, format='png')
-    buffer.seek(0)  # Reset buffer position
-    base64_image = base64.b64encode(buffer.getvalue()).decode("utf-8") # encode img into buffer
-    buffer.close()  # Close buffer
-    return base64_image
-
-def check_key_limit(client):
-    headers = {"Authorization": f"Bearer {client.api_key}",}
-
-    response = requests.get(f"{client.base_url}/auth/key", headers=headers)
-
-    if response.status_code == 200:
-        # Print the response data
-        return response.json()["data"]['limit_remaining']
-    else:
-        # Print an error message with the status code
-        print(f"Request failed with status code {response.status_code}")
-        return response.text
-    
-def get_prompt(function_list = None):
-    if function_list is None:
-        function_list = ["params[0]"]
-    
-    prompt = "import numpy as np \n"
-    for n in range(len(function_list)):
-        prompt += f"curve_{n} = lambda x,*params: {function_list[n]} \n"
-    prompt += f"curve_{len(function_list)} = lambda x,*params:"
-
-    return prompt
-
-def call_model(client, model, image, prompt, system_prompt=None):
-    if system_prompt is None:
-        system_prompt = ("Give an improved ansatz to the list for the image. Follow on from the users text with no explaining."
-                         "Params can be any length. There's some noise in the data, give preference to simpler functions.")
-
-    response = client.chat.completions.create(
-    model=model,
-    messages=[
-        { "role": "system", 
-         "content": system_prompt},
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{image}"},
-                },
-                {
-                    "type": "text",
-                    "text": prompt,
-                },
-            ],
-        }
-        ],
-        max_tokens=4096,
-        )
-    
-    return response
-
-def extract_ansatz(response):
-    text = response.choices[0].message.content
-    ansatz = text.split('\n')[1]
-    if ansatz.startswith("_curve") or ansatz.startswith("curve"):
-        ansatz = ansatz.split(":", 1)[1]
-
-    # Extract the values of params from the string
-    params_values = re.findall(r'params\[(\d+)\]', ansatz)
-
-    # Convert the extracted values to integers
-    params_values = list(map(int, params_values))
-
-    # Find the largest entry
-    largest_entry = max(params_values) + 1
-    return ansatz, largest_entry
-
-def fun_convert(ansatz):
-    ansatz = "lambda x,*params: " + ansatz
-    curve = eval(ansatz)
-    return curve
-
-def fit_curve(x, y, curve, largest_entry):
-    try:
-        params_initial = np.ones(largest_entry)
-        params_opt, _ = curve_fit(curve, x, y, p0=params_initial)
-        residuals = y - curve(x, *params_opt)
-        chi_squared = np.mean((residuals ** 2) / (np.square(curve(x, *params_opt))+1e-6))
-        return params_opt, chi_squared
-    except Exception as e:
-        #print(e)
-        return np.array(params_initial), np.inf
+import LLMSR.fit as fit
     
 def single_call(client, img, x, y, model="openai/gpt-4o-mini",function_list=None, system_prompt=None):
     try:
@@ -118,11 +14,11 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini",function_list=None
         resp = call_model(client, model, img, prompt, system_prompt=system_prompt)
         out = extract_ansatz(resp)
         curve = fun_convert(out[0])
-        params, uncert = fit_curve(x, y, curve, out[1])
+        params, score = fit.fit_curve(x, y, curve, out[1])
 
         return {
             "params": params,
-            "score": -uncert,
+            "score": -score,
             "ansatz": out[0],
             "Num_params": out[1],
             # "curve": curve, This wouldn't run for some reason
@@ -243,7 +139,7 @@ def generate_nested_functions(layer_connections):
     # Construct output as a list
     return [construct_layer(L, node) for node in layer_connections[L]]
 
-def to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3):
+def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3):
     res, res_fcts = 'Sin', {}
     layer_connections = {0: {i: [] for i in range(model.width_in[0])}}
     for l in range(len(model.width_in) - 1):

@@ -1,6 +1,10 @@
 setup.py
 LLMSR/__init__.py
+LLMSR/fit.py
+LLMSR/images.py
+LLMSR/llm.py
 LLMSR/llmSR.py
+LLMSR/response.py
 LLMSR.egg-info/PKG-INFO
 LLMSR.egg-info/SOURCES.txt
 LLMSR.egg-info/dependency_links.txt
