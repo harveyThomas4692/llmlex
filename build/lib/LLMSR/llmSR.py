@@ -122,7 +122,12 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
         finite_scores = scores[np.isfinite(scores)]
         normalized_scores = (scores - np.min(finite_scores)) / (np.max(finite_scores) - np.min(finite_scores) + 1e-6)
         exp_scores = np.exp((normalized_scores - np.max(normalized_scores))/temperature)
+        exp_scores = np.nan_to_num(exp_scores, nan=0.0)
+        if np.all(exp_scores == 0):
+            exp_scores = np.ones_like(exp_scores)
         probs = exp_scores / np.sum(exp_scores)
+
+        
 
         selected_population = [np.random.choice(populations[-1], size=2,
                                                  p=probs, replace=True) for _ in range(population_size)]
