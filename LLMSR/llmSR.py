@@ -52,7 +52,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini",function_list=None
         return None
 
 def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
-                temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5,system_prompt=None, elite=False):
+                temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5,system_prompt=None, elite=False, for_kan=False):
     """
         Run a genetic algorithm to fit a model to the given data.
         Parameters:
@@ -86,7 +86,7 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
         populations.append([{
             "params": params,
             "score": -chi_squared,
-            "ansatz": "lambda x,*params: params[0] * np.ones(len(x))",
+            "ansatz": "lambda x,*params: params[0] * np.ones(len(x))" if for_kan else "params[0]",
             "Num_params": 0,
             "response": None,
             "prompt": None,
@@ -106,6 +106,10 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
                 population.append(result)
                 good = True
 
+    for p in population:
+        if np.isnan(np.sum(p['score'])):
+            p['score'] = -1e8
+            
     population.sort(key=lambda x: x['score'])
     populations.append(population)
     best_pop = population[-1]
@@ -152,32 +156,6 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
         
     return populations
 
-def generate_nested_functions(layer_connections):
-    """
-    Generates a nested function expression for a symbolic computational graph.
-
-    Parameters:
-        layer_connections (dict): A dictionary where keys are layer indices (1 to L),
-                                  and values are lists of nodes in that layer, 
-                                  each containing a list of indices from the previous layer.
-
-    Returns:
-        str: Nested function string.
-    """
-    L = max(layer_connections.keys())
-    def construct_layer(l, node):
-        """Recursively constructs the function for a given node at layer l."""
-        if l == 0:
-            # Base case: Input layer directly maps to x_i
-            return f"f_{{0,{node}}}(x_{node})"
-        else:
-            # Construct sum of incoming connections
-            inputs = " + ".join([f"f_{{{l},{node}}}({construct_layer(l-1, prev)})" 
-                                 for prev in layer_connections[l].get(node, [])])
-            return f"({inputs})" if inputs else f"f_{{{l},{node}}}()"  # Handle empty case
-
-    # Construct output as a list
-    return [construct_layer(L, node) for node in layer_connections[L]]
 
 def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3):
     """
@@ -191,16 +169,13 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
         gpt_model (str, optional): The GPT model to use for generating symbolic functions. Default is "openai/gpt-4o-mini".
         exit_condition (float, optional): The exit condition for the genetic algorithm. Default is 1e-3.
     Returns:
-    tuple: A tuple containing:
         - res_fcts (dict): A dictionary mapping layer, input, and output indices to their corresponding symbolic functions.
-        - symb_formula (list): A list of symbolic formulas representing each part of the kan.
     """
 
     res, res_fcts = 'Sin', {}
     layer_connections = {0: {i: [] for i in range(model.width_in[0])}}
     for l in range(len(model.width_in) - 1):
         layer_connections[l] = {i: list(range(model.width_out[l-1])) if l > 0 else []  for i in range(model.width_in[l])}
-    symb_formula = generate_nested_functions(layer_connections)
     
     for l in range(len(model.width_in) - 1):
         for i in range(model.width_in[l]):
@@ -228,10 +203,9 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                     try:
                         res = run_genetic(client, base64_image, x, y, population, generations, temperature=temperature, model=gpt_model, system_prompt=None, elite=False, exit_condition=exit_condition)
                         res_fcts[(l,i,j)] = res
-                        # symb_formula = [s.replace(f'f_{{{l},{i}}}', res) for s in symb_formula]
                     except Exception as e:
                         print(e)
-                        res_fcts[(l,i,j)] = None
+                        res_fcts[(l,i,j)] = res
     ax.clear()
     plt.close()
-    return res_fcts, symb_formula
+    return res_fcts

@@ -22,7 +22,7 @@ def check_key_limit(client):
         print(f"Request failed with status code {response.status_code}")
         return response.text
     
-def get_prompt(function_list = None):
+def get_prompt(function_list=None):
     """
     Generates the user prompt given a list of functions.
     Args:
