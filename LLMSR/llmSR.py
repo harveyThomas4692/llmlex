@@ -206,7 +206,7 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                     plt.show()
                     mask = model.act_fun[l].mask
                     try:
-                        res = run_genetic(client, base64_image, x, y, population, generations, temperature=temperature, model=gpt_model, system_prompt=None, elite=False, exit_condition=exit_condition)
+                        res = run_genetic(client, base64_image, x, y, population, generations, temperature=temperature, model=gpt_model, system_prompt=None, elite=False, exit_condition=exit_condition, for_kan=True)
                         res_fcts[(l,i,j)] = res
                     except Exception as e:
                         print(e)
