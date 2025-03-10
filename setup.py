@@ -14,7 +14,7 @@ setuptools.setup(
     description="An open source python library for symbolic regression with LLMs",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    #url="https://github.com/harveyThomas4692/jax_metric_CalabiYau",
+    url="https://github.com/harveyThomas4692/LLM_SR",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
