@@ -13,6 +13,7 @@ from tests.test_fit import TestFit
 from tests.test_llm import TestLLM
 from tests.test_llmSR import TestLLMSR
 from tests.test_logging import TestLogging
+from tests.test_kan import TestKANFunctionality
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -56,6 +57,7 @@ def run_tests(include_real_api_tests=None):
     test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestLLM))
     test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestLLMSR))
     test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestLogging))
+    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestKANFunctionality))
     
     # Check if we should run real API tests
     should_run_api_tests = include_real_api_tests

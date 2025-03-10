@@ -119,7 +119,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
         
         If all attempts fail, it raises the last exception.
     """
-    logger.info(f"Starting single_call with model={model}, function_list size={len(function_list) if function_list else 0}")
+    logger.debug(f"Starting single_call with model={model}, function_list size={len(function_list) if function_list else 0}")
     
     retry_count = 0
     last_error = None
@@ -165,7 +165,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
             # These are parsing/formatting errors that might be worth retrying
             retry_count += 1
             last_error = e
-            logger.warning(f"Attempt {retry_count}/{max_retries} failed: {str(e)}")
+            logger.debug(f"Attempt {retry_count}/{max_retries} failed: {str(e)}")
             
             if retry_count > max_retries:
                 logger.error(f"All {max_retries} attempts failed. Last error: {str(e)}")
@@ -313,7 +313,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
     Returns: 
         dict: Result dictionary or None if all attempts fail
     """
-    logger.info(f"Starting async_single_call with model={model}, function_list size={len(function_list) if function_list else 0}")
+    logger.debug(f"Starting async_single_call with model={model}, function_list size={len(function_list) if function_list else 0}")
     
     retry_count = 0
     last_error = None
@@ -419,13 +419,13 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         """
     clear_rate_limit_lock()
 
-    logger.info(f"Starting genetic algorithm with population_size={population_size}, generations={num_of_generations}, model={model}")
+    logger.debug(f"Starting genetic algorithm with population_size={population_size}, generations={num_of_generations}, model={model}")
     logger.debug(f"Parameters: temperature={temperature}, exit_condition={exit_condition}, elite={elite}, for_kan={for_kan}")
     
     population = []
     populations = []
     
-    logger.info("Checking constant function as baseline")
+    logger.debug("Checking constant function as baseline")
     curve = lambda x, *params: params[0] * np.ones(len(x))
     params, _ = curve_fit(curve, x, y, p0=[1])
     residuals = y - params[0]*np.ones(len(x))
@@ -448,15 +448,11 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         }])
         return populations
         
-    print("Constant function is not a good fit.")
-    print("Score: ", -chi_squared)
-    print("Constant: ", params)
+    logger.info(f"Constant function is not a good fit: Score: {chi_squared}, for constant: {params}")
 
-    logger.info("Generating initial population")
-    print("Generating Initial population population")
     
     if use_async:
-        logger.info("Using async mode for population generation")
+        logger.info("Generating initial population asynchronously")
         
         async def generate_population():
             tasks = []
@@ -499,6 +495,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         logger.info(f"Generated {len(population)} individuals asynchronously")
     
     else:
+        logger.info("Generating initial population synchronously")
         # Original synchronous implementation
         for i in tqdm(range(population_size)):
             good = False
@@ -516,7 +513,6 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
             if not good:
                 logger.error(f"Failed to generate individual {i+1} after {attempts} attempts")
 
-    logger.debug("Handling NaN scores in population")
     # Check if we have a valid population
     if not population:
         error_msg = "Failed to generate any valid population members after multiple attempts"
@@ -533,21 +529,19 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     populations.append(population)
     best_pop = population[-1]
     logger.info(f"Initial population best: score={best_pop['score']}, params={best_pop['params']}")
-    logger.debug(f"Best ansatz: {best_pop['ansatz'][:50]}...")
+    logger.info(f"Best ansatz: {best_pop['ansatz'][:50]}...")
     
-    print("Best score: ", best_pop['score'])
-    print("Best ansatz: ", best_pop['ansatz'])
-    print("Best params: ", best_pop['params'])
+    logger.info(f"Best score: {best_pop['score']}")
+    logger.info(f"Best ansatz: {best_pop['ansatz'][:50]}...")
+    logger.info(f"Best params: {best_pop['params']}")
     
     if best_pop['score'] > -exit_condition:
         logger.info("Exit condition met after initial population")
-        print("Exit condition met.")
         return populations
 
     # Evolution loop
     for generation in range(num_of_generations-1):
         logger.info(f"Starting generation {generation+1}/{num_of_generations-1}")
-        print(f"Generation: {generation+1}")
         
         logger.debug("Computing selection probabilities")
         scores = np.array([ind['score'] for ind in population])
@@ -670,10 +664,17 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
     Returns:
         - res_fcts (dict): A dictionary mapping layer, input, and output indices to their corresponding symbolic functions.
     """
-    logger.info(f"Starting KAN to symbolic conversion with population={population}, generations={generations}")
+    logger.debug(f"Starting KAN to symbolic conversion with population={population}, generations={generations}")
     logger.debug(f"KAN model has {len(model.width_in)} layers")
 
     res, res_fcts = 'Sin', {}
+    
+    # Initialize symb_formula to hold placeholders for all connections
+    symb_formula = []
+    for l in range(len(model.width_in) - 1):
+        for i in range(model.width_in[l]):
+            for j in range(model.width_out[l]):
+                symb_formula.append(f'f_{{{l},{i},{j}}}')
     
     # Setup layer connections
     logger.debug("Setting up layer connections")
@@ -696,33 +697,44 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                 
                 if (model.symbolic_fun[l].mask[j, i] > 0. and model.act_fun[l].mask[i][j] == 0.):
                     logger.info(f'Skipping ({l},{i},{j}) - already symbolic')
-                    print(f'skipping ({l},{i},{j}) since already symbolic')
                     symb_formula = [s.replace(f'f_{{{l},{i},{j}}}', 'TODO') for s in symb_formula]
                     symbolic_connections += 1
                     
                 elif (model.symbolic_fun[l].mask[j, i] == 0. and model.act_fun[l].mask[i][j] == 0.):
                     logger.info(f'Fixing ({l},{i},{j}) with 0')
                     model.fix_symbolic(l, i, j, '0', verbose=verbose > 1, log_history=False)
-                    print(f'fixing ({l},{i},{j}) with 0')
                     symb_formula = [s.replace(f'f_{{{l},{i},{j}}}', '0') for s in symb_formula]
                     res_fcts[(l, i, j)] = None
                     zero_connections += 1
                     
                 else:
-                    logger.info(f'Processing non-symbolic connection ({l},{i},{j})')
+                    logger.info(f'Processing non-symbolic activation function ({l},{i},{j})')
                     processed_connections += 1
                     
                     # Generate data for the connection
-                    logger.debug(f"Getting range data for connection ({l},{i},{j})")
+                    logger.debug(f"Getting range data for activation function ({l},{i},{j})")
                     x_min, x_max, y_min, y_max = model.get_range(l, i, j, verbose=False)
-                    x, y = model.acts[l][:, i].cpu().detach().numpy(), model.spline_postacts[l][:, j, i].cpu().detach().numpy()
+                    # Handle PyTorch tensors or NumPy arrays
+                    x_data = model.acts[l][:, i]
+                    y_data = model.spline_postacts[l][:, j, i]
+                    
+                    # Convert to numpy if it's a PyTorch tensor
+                    if hasattr(x_data, 'cpu') and hasattr(x_data, 'detach'):
+                        x = x_data.cpu().detach().numpy()
+                    else:
+                        x = np.array(x_data)
+                        
+                    if hasattr(y_data, 'cpu') and hasattr(y_data, 'detach'):
+                        y = y_data.cpu().detach().numpy()
+                    else:
+                        y = np.array(y_data)
                     
                     # Sort data by x values
                     ordered_in = np.argsort(x)
                     x, y = x[ordered_in], y[ordered_in]
                     
                     # Generate plot
-                    logger.debug(f"Generating plot for connection ({l},{i},{j})")
+                    logger.info(f"Generating plot for activation function ({l},{i},{j}) - this is what we're fitting.")
                     fig, ax = plt.subplots()
                     plt.xticks([x_min, x_max], ['%2.f' % x_min, '%2.f' % x_max])
                     plt.yticks([y_min, y_max], ['%2.f' % y_min, '%2.f' % y_max])
@@ -756,8 +768,8 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
     try:
         ax.clear()
         plt.close()
-    except:
-        logger.warning("Could not clean up matplotlib resources")
+    except Exception as e:
+        logger.info(f"Could not clean up matplotlib resources: {e}. Not a cause for concern.")
     
     # Log summary
     logger.info(f"KAN conversion complete: {total_connections} total connections")
