@@ -14,6 +14,7 @@ Requires-Dist: numpy
 Requires-Dist: tqdm
 Requires-Dist: openai
 Requires-Dist: matplotlib
+Requires-Dist: python-dotenv
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier

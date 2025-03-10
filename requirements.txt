@@ -3,3 +3,6 @@ numpy
 tqdm
 openai
 matplotlib
+python-dotenv
+requests
+nest-asyncio

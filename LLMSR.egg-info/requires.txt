@@ -3,3 +3,4 @@ numpy
 tqdm
 openai
 matplotlib
+python-dotenv
