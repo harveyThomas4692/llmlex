@@ -88,7 +88,7 @@ def extract_ansatz(response):
     params_values = list(map(int, params_values))
     
     if not params_values:
-        logger.warning(f"No parameters found in initial ansatz extraction, searching full response")
+        logger.debug(f"No parameters found in initial ansatz extraction, searching full response")
         # Try to find any expression with params in the entire response
         for line in lines:
             if "params" in line:
@@ -113,7 +113,7 @@ def extract_ansatz(response):
                 logger.debug(f"Found backtick-enclosed ansatz: {ansatz[:50]}{'...' if len(ansatz) > 50 else ''}")
         
         if not params_values:
-            logger.error(f"No parameters found in ansatz or full response: {text[:200]}...")
+            logger.debug(f"No parameters found in ansatz or full response: {text[:200]}...")
             raise ValueError(f"No parameters found in ansatz: '{ansatz}'")
     
     # Find the largest parameter index
@@ -167,3 +167,176 @@ def fun_convert(ansatz):
     
     logger.debug("Successfully converted ansatz to lambda function")
     return curve, num_params
+
+    # Create a counter object to track API call statistics
+class APICallStats:
+    def __init__(self):
+        self.success_count = 0
+        
+        # Track errors by stage of processing
+        self.stages = {
+            "api_call": {"success": 0, "failure": 0},
+            "ansatz_extraction": {"success": 0, "failure": 0},
+            "function_conversion": {"success": 0, "failure": 0},
+            "curve_fitting": {"success": 0, "failure": 0}
+        }
+        
+        # Track detailed error types
+        self.error_types = {
+            # API errors
+            "rate_limit": 0,
+            "api_connection": 0,
+            "timeout": 0,
+            
+            # Extraction errors
+            "no_parameters": 0,
+            "invalid_response": 0,
+            "empty_response": 0,
+            
+            # Function conversion errors
+            "syntax_error": 0,
+            "name_error": 0,
+            "type_error": 0,
+            
+            # Curve fitting errors
+            "convergence_error": 0,
+            "singular_matrix": 0,
+            "numerical_error": 0,
+            
+            # Other errors
+            "other": 0
+        }
+    
+    def add_success(self):
+        """Record a completely successful API call cycle"""
+        self.success_count += 1
+    
+    def stage_success(self, stage):
+        """Record success for a specific stage"""
+        if stage in self.stages:
+            self.stages[stage]["success"] += 1
+        
+    def stage_failure(self, stage, error, error_type=None):
+        """
+        Record failure for a specific stage
+        
+        Args:
+            stage: The processing stage where the error occurred
+            error: The exception object or error message
+            error_type: Optional specific error type to increment
+        """
+        if stage in self.stages:
+            self.stages[stage]["failure"] += 1
+        
+        # If no specific error type was provided, categorize based on the error
+        if error_type is None:
+            self._categorize_error(error)
+        else:
+            if error_type in self.error_types:
+                self.error_types[error_type] += 1
+            else:
+                self.error_types["other"] += 1
+    
+    def _categorize_error(self, error):
+        """Categorize an error based on its type and message"""
+        error_str = str(error).lower()
+        
+        # API errors
+        if isinstance(error, Exception) and any(term in error_str for term in ["rate limit", "ratelimit", "too many requests"]):
+            self.error_types["rate_limit"] += 1
+        elif isinstance(error, Exception) and any(term in error_str for term in ["connect", "connection", "network", "timeout", "timed out"]):
+            self.error_types["api_connection"] += 1
+        elif isinstance(error, Exception) and "timeout" in error_str:
+            self.error_types["timeout"] += 1
+            
+        # Extraction errors
+        elif isinstance(error, ValueError) and "no parameters found" in error_str:
+            self.error_types["no_parameters"] += 1
+        elif isinstance(error, ValueError) and any(term in error_str for term in ["format", "unexpected", "not recognized"]):
+            self.error_types["invalid_response"] += 1
+        elif isinstance(error, ValueError) and any(term in error_str for term in ["empty", "no content"]):
+            self.error_types["empty_response"] += 1
+            
+        # Function conversion errors
+        elif isinstance(error, SyntaxError):
+            self.error_types["syntax_error"] += 1
+        elif isinstance(error, NameError):
+            self.error_types["name_error"] += 1
+        elif isinstance(error, TypeError):
+            self.error_types["type_error"] += 1
+            
+        # Curve fitting errors
+        elif any(term in error_str for term in ["convergence", "converge", "maximum number of iterations"]):
+            self.error_types["convergence_error"] += 1
+        elif any(term in error_str for term in ["singular", "invert", "invertible"]):
+            self.error_types["singular_matrix"] += 1
+        elif any(term in error_str for term in ["overflow", "underflow", "divide by zero", "domain", "nan", "inf"]):
+            self.error_types["numerical_error"] += 1
+            
+        # Other errors
+        else:
+            self.error_types["other"] += 1
+    
+    def total_failures(self):
+        """Get the total number of failures across all error types"""
+        return sum(self.error_types.values())
+    
+    def get_stage_stats(self, stage):
+        """Get statistics for a specific processing stage"""
+        if stage not in self.stages:
+            return None
+            
+        stats = self.stages[stage]
+        total = stats["success"] + stats["failure"]
+        success_rate = (stats["success"] / total * 100) if total > 0 else 0
+        
+        return {
+            "success": stats["success"],
+            "failure": stats["failure"],
+            "total": total,
+            "success_rate": success_rate
+        }
+        
+    def __str__(self):
+        """Generate a comprehensive statistics report"""
+        total_calls = self.success_count + self.total_failures()
+        success_rate = (self.success_count / total_calls * 100) if total_calls > 0 else 0
+        
+        result = []
+        result.append(f"API Call Statistics:")
+        result.append(f"  Successful calls (end-to-end): {self.success_count}")
+        result.append(f"  Failed calls: {self.total_failures()}")
+        result.append(f"  Success rate: {success_rate:.2f}%")
+        
+        # Add stage-specific statistics
+        result.append("\nBreakdown by processing stage:")
+        for stage, stats in self.stages.items():
+            total = stats["success"] + stats["failure"]
+            if total > 0:
+                success_rate = (stats["success"] / total * 100)
+                result.append(f"  {stage.replace('_', ' ').title()}: {stats['success']} succeeded, {stats['failure']} failed ({success_rate:.2f}% success)")
+        
+        # Add error type statistics
+        result.append("\nError types:")
+        
+        # Group error types by category
+        categories = {
+            "API Errors": ["rate_limit", "api_connection", "timeout"],
+            "Extraction Errors": ["no_parameters", "invalid_response", "empty_response"],
+            "Function Errors": ["syntax_error", "name_error", "type_error"],
+            "Fitting Errors": ["convergence_error", "singular_matrix", "numerical_error"],
+            "Other": ["other"]
+        }
+        temp_result = []
+        for category, error_types in categories.items():
+            category_errors = [(error_type, self.error_types[error_type]) for error_type in error_types if self.error_types[error_type] > 0]
+            if category_errors:
+                temp_result.append(f"  {category}:")
+                for error_type, count in category_errors:
+                    temp_result.append(f"    - {error_type.replace('_', ' ')}: {count}")
+        if len(temp_result)==0:
+            result.append("No errors")
+        else:
+            result.extend(temp_result)
+        
+        return "\n".join(result)

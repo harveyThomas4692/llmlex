@@ -41,10 +41,20 @@ class TestFit(unittest.TestCase):
         # Create a function that will raise an exception
         def bad_func(x, *params):
             raise ValueError("Intentional test error")
-        
         # Try to fit the curve
-        params, chi_squared = fit_curve(self.x, self.y, bad_func, 3)
+        # Temporarily disable logging during this test so we don't see the error message
+        # Temporarily suppress fit module logging
+        import logging
+        logger = logging.getLogger("LLMSR.fit")
+        original_level = logger.level
+        logger.setLevel(logging.CRITICAL)
         
+        try:
+            params, chi_squared = fit_curve(self.x, self.y, bad_func, 3)
+        finally:
+            # Restore original logging level
+            logger.setLevel(original_level)
+            
         # Check that we get the expected default values
         np.testing.assert_array_equal(params, np.ones(3))
         self.assertEqual(chi_squared, np.inf)

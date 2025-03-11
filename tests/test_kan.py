@@ -5,8 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from unittest.mock import MagicMock, patch, ANY
 
-# Add the parent directory to the path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+# Add the parent directory to the path if it's not already there
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 # Import the module to test
 import LLMSR.llmSR
@@ -127,7 +129,7 @@ def test_kan_to_symbolic(model, client, population=10, generations=3, temperatur
         ax.clear()
         LLMSR.llmSR.plt.close()
     except:
-        logger.warning("Could not clean up matplotlib resources")
+        logger.debug("Could not clean up matplotlib resources - not a cause for concern")
     
     # Log summary
     logger.info(f"KAN conversion complete: {total_connections} total connections")
@@ -361,7 +363,7 @@ class TestKANFunctionality(unittest.TestCase):
         def side_effect(*args, **kwargs):
             call_count[0] += 1
             if call_count[0] == 2:  # Second call raises error
-                raise ValueError("Test error")
+                raise ValueError("Testing error handling - this error is expected, and is not a concern.")
             return [
                 [{
                     'params': np.array([1.0, 2.0, 3.0]),
@@ -384,15 +386,18 @@ class TestKANFunctionality(unittest.TestCase):
         self.mock_kan.act_fun[0].mask[0, 1] = 1.0
         self.mock_kan.act_fun[0].mask[1, 0] = 1.0
         
-        # Call our test function
-        result = test_kan_to_symbolic(
-            self.mock_kan, 
-            self.mock_client,
-            population=2, 
-            generations=1,
-            exit_condition=0.1
-        )
+        # Call our test function - we expect a critical log when the error occurs
+        with self.assertLogs(level='ERROR') as log_context:  # Use ERROR level instead of CRITICAL
+            result = test_kan_to_symbolic(
+                self.mock_kan, 
+                self.mock_client,
+                population=2, 
+                generations=1,
+                exit_condition=0.1
+            )
         
+        # Verify error was logged
+        self.assertTrue(any('Testing error handling - this error is expected, and is not a concern.' in msg for msg in log_context.output))
         # The function should continue despite errors
         self.assertIsInstance(result, dict)
         

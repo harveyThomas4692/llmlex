@@ -41,8 +41,7 @@ class TestLogging(unittest.TestCase):
         # This test just verifies that the logger is properly configured 
         # in the single_call function, without actually calling it
         logger = logging.getLogger("LLMSR.llmSR")
-        logger.info("Test single_call logging message")
-        
+        logger.debug("Test single_call logging message")
         # Verify logs were created
         log_content = self.log_capture.getvalue()
         
@@ -72,7 +71,7 @@ class TestLogging(unittest.TestCase):
         # Setup mock
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"data": {"limit_remaining": 100}}
+        mock_response.json.return_value = {"data": {"limit_remaining": -99999999}}
         mock_get.return_value = mock_response
         
         # Setup client mock
@@ -109,59 +108,46 @@ class TestLogging(unittest.TestCase):
         self.assertIn("Response content length", log_content)
         self.assertIn("Converting ansatz string to lambda function", log_content)
     
-    @patch('LLMSR.llmSR.single_call')
-    @patch('LLMSR.llmSR.curve_fit')
-    @patch('numpy.mean')
-    def test_run_genetic_logging(self, mock_mean, mock_curve_fit, mock_single_call):
+    def test_run_genetic_logging(self):
         """Test logging in run_genetic function"""
-        # Setup mocks
-        mock_curve_fit.return_value = (np.array([1.0]), None)
-        mock_mean.return_value = 0.5  # Return a constant value for chi_squared
-        
-        # Create mock results for single_call
-        def single_call_side_effect(*args, **kwargs):
-            return {
-                'params': np.array([0.1, 2.0, 3.0]),
-                'score': -0.001,
-                'ansatz': 'params[0] * np.exp(-params[1] * x) * np.sin(params[2] * x)',
-                'Num_params': 3,
-                'response': MagicMock(),
-                'prompt': 'test prompt',
-                'function_list': None
-            }
-        
-        mock_single_call.side_effect = single_call_side_effect
-        
-        # Generate test data
+        # Create test data
         x = np.linspace(0.01, 1, 10)
         y = x**2
-        
-        # Create a fake base64 image
         base64_image = "fake_base64_string"
-        
-        # Make the call with minimal parameters to avoid full execution
         client = MagicMock()
-        population_size = 1  # Minimal population size
-        num_of_generations = 1
         
-        # Modify mock_mean behavior for initialization
-        mock_mean.side_effect = [10.0]  # Set chi_squared above exit_condition
+        # Create mock result that will be returned by single_call
+        mock_result = {
+            'params': np.array([0.1, 2.0, 3.0]),
+            'score': -0.001,
+            'ansatz': 'params[0] * np.exp(-params[1] * x) * np.sin(params[2] * x)',
+            'Num_params': 3,
+            'response': "mock response",
+            'prompt': 'test prompt',
+            'function_list': None
+        }
         
-        result = LLMSR.run_genetic(
-            client, base64_image, x, y, 
-            population_size, num_of_generations,
-            temperature=1.0, exit_condition=0.0001  # Very strict exit condition
-        )
-        
-        # Verify logs
-        log_content = self.log_capture.getvalue()
-        
-        # Check for specific log messages
-        self.assertIn("Starting genetic algorithm", log_content)
-        self.assertIn("Checking constant function", log_content)
-        
-        # Should have called single_call at least once (for population initialization)
-        mock_single_call.assert_called()
+        # Use patch context managers instead of direct module attribute modification
+        with patch('LLMSR.llmSR.single_call', return_value=mock_result), \
+             patch('LLMSR.llmSR.async_single_call', side_effect=lambda *args, **kwargs: mock_result), \
+             patch('LLMSR.llmSR.curve_fit', return_value=(np.array([1.0]), None)), \
+             patch('numpy.mean', return_value=10.0):  # Chi squared above exit condition
+            
+            # Run with synchronous mode to avoid coroutine warnings
+            result = LLMSR.run_genetic(
+                client, base64_image, x, y, 
+                population_size=1, num_of_generations=1,
+                temperature=1.0, exit_condition=0.0001,  # Very strict exit condition
+                use_async=False  # Use sync mode to avoid coroutine warnings
+            )
+            
+            # Verify logs
+            log_content = self.log_capture.getvalue()
+            
+            # Check for specific log messages
+            self.assertIn("Starting genetic algorithm", log_content)
+            self.assertIn("Checking constant function", log_content)
+            self.assertIn("Generating initial population", log_content)
     
     @patch('LLMSR.fit.curve_fit')    
     def test_fit_logging(self, mock_curve_fit):
@@ -188,9 +174,9 @@ class TestLogging(unittest.TestCase):
         """Test logging in kan_to_symbolic function with basic validation"""
         # Just verify that our logger works
         logger = logging.getLogger("LLMSR.llmSR")
-        logger.info("Starting KAN to symbolic conversion")
-        logger.info("KAN model has 2 layers")
-        logger.info("KAN test logging message")
+        logger.debug("Starting KAN to symbolic conversion")
+        logger.debug("KAN model has 2 layers")
+        logger.debug("KAN test logging message")
         
         # Verify log capture
         log_content = self.log_capture.getvalue()

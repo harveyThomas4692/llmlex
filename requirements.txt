@@ -6,3 +6,7 @@ matplotlib
 python-dotenv
 requests
 nest-asyncio
+pykan
+scikit-learn
+PyYAML
+pandas

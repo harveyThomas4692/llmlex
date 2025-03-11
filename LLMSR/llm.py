@@ -10,8 +10,8 @@ from functools import wraps
 logger = logging.getLogger("LLMSR.llm")
 
 # Default API call rate limiter values
-DEFAULT_MAX_CALLS_PER_MINUTE = 20
-DEFAULT_TEST_MAX_CALLS_PER_MINUTE = 3  # More restrictive rate limit for tests
+DEFAULT_MAX_CALLS_PER_MINUTE = 120
+DEFAULT_TEST_MAX_CALLS_PER_MINUTE = 10  # More restrictive rate limit for tests
 
 # Global tracking variables for rate limiting
 _last_api_call_time = 0
@@ -234,14 +234,14 @@ def get_prompt(function_list=None):
     
     # Use default if no function list provided
     if function_list is None:
-        function_list = ["params[0]"]
+        function_list = [("params[0]", 1)]
         logger.debug("No function list provided, using default: ['params[0]']")
     
     # Build the prompt
     prompt = "import numpy as np \n"
     for n in range(len(function_list)):
-        prompt += f"curve_{n} = lambda x,*params: {function_list[n]} \n"
-    prompt += f"curve_{len(function_list)} = lambda x,*params:"
+        prompt += f"curve_{n} = lambda x, *params: {function_list[n][0]} \n"
+    prompt += f"curve_{len(function_list)} = lambda x, *params:"
 
     logger.debug(f"Generated prompt with {len(function_list)} functions")
     return prompt
@@ -256,7 +256,7 @@ def call_model(client, model, image, prompt, system_prompt=None):
         image (str): The image data encoded in base64 format.
         prompt (str): The text prompt provided by the user.
         system_prompt (str, optional): The system prompt to guide the model's response. If none provided it defaults to:
-                                        "Give an improved ansatz to the list for the image. Follow on from the users text with no explaining.
+                                        "Give an improved ansatz in python to the list for the image. Follow on from the users text with no explaining.
                                         Params can be any length. If there's some noise in the data, give preference to simpler functions"
     Returns:
         dict: The response from the model, typically containing the generated text or other relevant information.
@@ -266,9 +266,14 @@ def call_model(client, model, image, prompt, system_prompt=None):
     
     # Set default system prompt if not provided
     if system_prompt is None:
-        system_prompt = ("Give an improved ansatz to the list for the image. Follow on from the users text with no explaining."
-                         "Params can be any length. If there's some noise in the data, give preference to simpler functions.")
-        logger.debug("Using default system prompt")
+        #system_prompt = ("Give an improved ansatz to the list for the image. Follow on from the users text with no explaining."
+        #                 "Params can be any length. If there's some noise in the data, give preference to simpler functions"
+        # THIS IS THE SYSTEM PROMPT FOR THE SYNC MODEL - see LLMSR.py for the async version
+        system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz (formula template). "
+                         "Respond with ONLY the ansatz formula, without any explanation or commentary. Ensure it is in valid python. You may use numpy functions. "
+                         "params is a list of parameters that can be of any length or complexity. "
+                         "Since the data contains noise, prioritize simpler, more elegant functions that capture the underlying pattern rather than fitting every point. ")
+        logger.debug("Using default system prompt: \n" + system_prompt)
     
     # Track image size for debugging purposes
     image_size = len(image) if image else 0
@@ -313,4 +318,106 @@ def call_model(client, model, image, prompt, system_prompt=None):
     except Exception as e:
         # Log and re-raise any exceptions
         logger.error(f"Error calling model {model}: {e}", exc_info=True)
+        raise
+
+@async_rate_limit_api_call
+async def async_call_model(client, model, image, prompt, system_prompt=None):
+    """
+    Asynchronous version of call_model. Initiates a call to the LLM with an image.
+    
+    Args:
+        client (object): The client object used to interact with the model.
+        model (str): The name or identifier of the model to be used.
+        image (str): The image data encoded in base64 format.
+        prompt (str): The text prompt provided by the user.
+        system_prompt (str, optional): The system prompt to guide the model's response.
+                                       If None, uses the default system prompt.
+    
+    Returns:
+        dict: The response from the model.
+    """
+    import asyncio
+    
+    logger.debug(f"Async calling model {model}")
+    
+    # Set default system prompt if not provided
+    if system_prompt is None:
+        system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz (formula template). "
+                         "Respond with ONLY the ansatz formula, without any explanation or commentary. Ensure it is in valid python. You may use numpy functions. "
+                         "params is a list of parameters that can be of any length or complexity. "
+                         "Since the data contains noise, prioritize simpler, more elegant functions that capture the underlying pattern rather than fitting every point. ")
+        logger.debug("Using default system prompt: \n" + system_prompt)
+    
+    # Track image size for debugging purposes
+    image_size = len(image) if image else 0
+    logger.debug(f"Image size: {image_size} characters (base64)")
+    logger.debug(f"Prompt length: {len(prompt)} characters")
+    
+    try:
+        # Check if the client supports async operations directly
+        if hasattr(client.chat.completions, 'acreate'):
+            # Use the async API if available
+            logger.debug("Creating async chat completion request")
+            response = await client.chat.completions.acreate(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{image}"},
+                            },
+                            {
+                                "type": "text",
+                                "text": prompt,
+                            },
+                        ],
+                    }
+                ],
+                max_tokens=4096,
+            )
+        else:
+            # If no async API is available, use the sync API in a thread pool
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                response = await loop.run_in_executor(
+                    pool,
+                    lambda: client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {"url": f"data:image/png;base64,{image}"},
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": prompt,
+                                    },
+                                ],
+                            }
+                        ],
+                        max_tokens=4096,
+                    )
+                )
+        
+        # Log response info
+        try:
+            token_usage = response.usage.total_tokens if hasattr(response, 'usage') else 'unknown'
+            logger.debug(f"Model response received. Total tokens: {token_usage}")
+            logger.debug(f"Response finish reason: {response.choices[0].finish_reason if hasattr(response.choices[0], 'finish_reason') else 'unknown'}")
+        except:
+            logger.debug("Could not access token usage information")
+        
+        return response
+        
+    except Exception as e:
+        # Log and re-raise any exceptions
+        logger.error(f"Error calling model {model} asynchronously: {e}", exc_info=True)
         raise

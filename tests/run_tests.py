@@ -73,7 +73,6 @@ def run_tests(include_real_api_tests=None):
         # Create a separate test suite just for API tests
         api_test_suite = unittest.TestSuite()
         api_test_suite.addTest(TestLLMSR('test_real_api_call'))
-        api_test_suite.addTest(TestLLMSR('test_real_api_async'))
         
         # Add to main test suite
         test_suite.addTest(api_test_suite)

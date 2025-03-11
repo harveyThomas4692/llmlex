@@ -1,29 +1,30 @@
 import os
 import sys
 import unittest
+import asyncio
 from unittest.mock import MagicMock, patch
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from LLMSR.llm import get_prompt, call_model
+from LLMSR.llm import get_prompt, call_model, async_call_model
 
 class TestLLM(unittest.TestCase):
     def test_get_prompt_default(self):
         """Test get_prompt with default parameters"""
         prompt = get_prompt()
-        expected = "import numpy as np \ncurve_0 = lambda x,*params: params[0] \ncurve_1 = lambda x,*params:"
+        expected = "import numpy as np \ncurve_0 = lambda x, *params: params[0] \ncurve_1 = lambda x, *params:"
         self.assertEqual(prompt, expected)
     
     def test_get_prompt_custom(self):
         """Test get_prompt with custom function list"""
-        function_list = ["params[0] * x**2", "params[0] * np.sin(params[1] * x)"]
+        function_list = [("params[0] * x**2", 1), ("params[0] * np.sin(params[1] * x)", 2)]
         prompt = get_prompt(function_list)
         expected = (
             "import numpy as np \n"
-            "curve_0 = lambda x,*params: params[0] * x**2 \n"
-            "curve_1 = lambda x,*params: params[0] * np.sin(params[1] * x) \n"
-            "curve_2 = lambda x,*params:"
+            "curve_0 = lambda x, *params: params[0] * x**2 \n"
+            "curve_1 = lambda x, *params: params[0] * np.sin(params[1] * x) \n"
+            "curve_2 = lambda x, *params:"
         )
         self.assertEqual(prompt, expected)
     
@@ -67,6 +68,45 @@ class TestLLM(unittest.TestCase):
         
         # Check that the result was returned
         self.assertEqual(result, mock_response)
+    
+    @patch('LLMSR.llm._rate_limit_lock')
+    def test_async_call_model(self, mock_lock):
+        """Test async_call_model function with mocked client"""
+        # Create mocks for lock functionality
+        mock_lock.__enter__ = MagicMock(return_value=None)
+        mock_lock.__exit__ = MagicMock(return_value=None)
+        
+        # Create mock client and response
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        
+        # Set up the mock to handle async calls properly
+        async def mock_acreate(*args, **kwargs):
+            return mock_response
+        
+        # Attach the async method to our mock
+        mock_client.chat.completions.acreate = mock_acreate
+        
+        # Create a test coroutine
+        async def test_coro():
+            result = await async_call_model(
+                mock_client,
+                "openai/gpt-4o",
+                "dummy_base64_image",
+                "test prompt",
+                "test system prompt"
+            )
+            return result
+        
+        # Run the coroutine in an event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(test_coro())
+            self.assertEqual(result, mock_response)
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
 
 if __name__ == '__main__':
     unittest.main()

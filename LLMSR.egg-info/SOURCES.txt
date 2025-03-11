@@ -11,9 +11,11 @@ LLMSR.egg-info/dependency_links.txt
 LLMSR.egg-info/requires.txt
 LLMSR.egg-info/top_level.txt
 tests/__init__.py
+tests/run_real_api_tests.py
 tests/run_tests.py
 tests/test_fit.py
 tests/test_images.py
 tests/test_llm.py
 tests/test_llmSR.py
+tests/test_logging.py
 tests/test_response.py
