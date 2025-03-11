@@ -162,7 +162,7 @@ def run_genetic(client, base64_image, x, y, population_size,num_of_generations,
     return populations
 
 
-def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3):
+def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, llm_model="openai/gpt-4o-mini", exit_condition=1e-3):
     """
     Converts a given kan model symbolic representations using llmsr.
     Parameters:
@@ -171,7 +171,7 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
         population (int, optional): The population size for the genetic algorithm. Default is 10.
         generations (int, optional): The number of generations for the genetic algorithm. Default is 3.
         temperature (float, optional): The temperature parameter for the genetic algorithm. Default is 0.1.
-        gpt_model (str, optional): The GPT model to use for generating symbolic functions. Default is "openai/gpt-4o-mini".
+        llm_model (str, optional): The GPT model to use for generating symbolic functions. Default is "openai/gpt-4o-mini".
         exit_condition (float, optional): The exit condition for the genetic algorithm. Default is 1e-3.
     Returns:
         - res_fcts (dict): A dictionary mapping layer, input, and output indices to their corresponding symbolic functions.
@@ -206,7 +206,7 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                     plt.show()
                     mask = model.act_fun[l].mask
                     try:
-                        res = run_genetic(client, base64_image, x, y, population, generations, temperature=temperature, model=gpt_model, system_prompt=None, elite=False, exit_condition=exit_condition, for_kan=True)
+                        res = run_genetic(client, base64_image, x, y, population, generations, temperature=temperature, model=llm_model, system_prompt=None, elite=False, exit_condition=exit_condition, for_kan=True)
                         res_fcts[(l,i,j)] = res
                     except Exception as e:
                         print(e)
