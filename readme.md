@@ -59,7 +59,6 @@ populations = LLMSR.run_genetic(
 LLM_SR can be used to extract interpretable symbolic expressions from trained KAN models:
 
 ```python
-# Assuming you have a trained KAN model
 import torch
 from kan import KAN, create_dataset
 
@@ -68,7 +67,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = KAN(width=[2,1,1,1], grid=7, k=3, seed=0, device=device)
 
 # Create dataset
-f = lambda x: torch.exp(torch.sin(torch.pi*x[:,[0]]) + x[:,[1]]**2)
+f = lambda x: torch.exp(torch.sin(torch.pi*x[:,[0]]) + x[:,[1]]**2) # should be a torch function
 dataset = create_dataset(f, n_var=2, train_num=1000, test_num=100, device=device)
 model.fit(dataset, opt="LBFGS", steps=100)
 
@@ -93,6 +92,32 @@ popt, _ = curve_fit(
     dataset['train_label'].cpu().numpy().flatten(), 
     p0=best_params
 )
+```
+
+`generate_learned_f` finds the optimised paramters for the symbolic expression, but does not simplify the expression. For that, use `optimize_expression` in `kan_sr.py`, or `run_complete_pipeline` for a complete end-to-end pipeline.
+
+For a complete end-to-end symbolic regression pipeline using KANs, use the `run_complete_pipeline` function, or see the example notebook `Examples/kan_sr_example.ipynb`.
+
+```python
+# Complete KAN-SR Pipeline
+# Run the complete pipeline with custom parameters
+results = LLMSR.kan_sr.run_complete_pipeline(
+    client, f,
+    ranges=x_range,
+    width=[1, 4, 1],  # Use a wider network for this more complex function
+    grid=7,
+    k=3,
+    train_steps=500,  # More training steps
+    gpt_model="openai/gpt-4o",
+    node_th=0.1,      # More conservative pruning
+    edge_th=0.1,
+    custom_system_prompt_for_second_simplification=system_prompt_for_second_simplification,
+    generations = 3,
+    population=10,
+    plot_parents=True,
+    demonstrate_parent_plotting=True
+)
+
 ```
 
 ## Running Tests

@@ -167,7 +167,7 @@ class TestLogging(unittest.TestCase):
         log_content = self.log_capture.getvalue()
         self.assertIn("Fitting curve with", log_content)
         self.assertIn("Data shape", log_content)
-        self.assertIn("Initial parameters", log_content)
+        self.assertIn("initial parameters", log_content)
         self.assertIn("Running curve_fit optimization", log_content)
     
     def test_kan_to_symbolic_logging(self):

@@ -126,7 +126,7 @@ def generate_base64_image(fig, ax, x, y):
         logger.error(f"Error generating base64 image: {e}", exc_info=True)
         raise
 
-def generate_base64_image_with_parents( x, y, parent_functions, fig = None, ax = None):
+def generate_base64_image_with_parents( x, y, parent_functions, fig = None, ax = None, actually_plot = False, title_override = None):
     """
     Generates a base64 encoded PNG image with data and parent functions.
     Args:
@@ -159,7 +159,7 @@ def generate_base64_image_with_parents( x, y, parent_functions, fig = None, ax =
             func_actual = fun_convert(func[0])[0]
             y_func = func_actual(x, *func[1])
             color_idx = i % len(colors)
-            ax.plot(x, y_func, color=colors[color_idx], alpha=0.3, label=f'curve_{i}', linestyle=':', dashes=(i+1, 1))
+            ax.plot(x, y_func, color=colors[color_idx], alpha=0.7, label=f'curve_{i}', linestyle=':', dashes=(i+1, 1))
         
         # Plot main data in bright blue
         ax.plot(x, y, color='blue', linewidth=2, label='data to be fitted')
@@ -182,7 +182,12 @@ def generate_base64_image_with_parents( x, y, parent_functions, fig = None, ax =
         
         # Clean up
         buffer.close()
-        plt.close(fig)  # Ensure the plot is not displayed
+        if actually_plot:
+            if title_override is not None:
+                plt.title(title_override)
+            plt.show()
+        else:
+            plt.close(fig)  # Ensure the plot is not displayed
         
         logger.debug(f"Successfully generated base64 image: {len(base64_image)} characters")
         return base64_image

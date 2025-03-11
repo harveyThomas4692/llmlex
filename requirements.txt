@@ -9,4 +9,5 @@ nest-asyncio
 pykan
 scikit-learn
 PyYAML
+torch
 pandas

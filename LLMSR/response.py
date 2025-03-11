@@ -152,6 +152,15 @@ def fun_convert(ansatz):
             # No parameters found
             logger.debug("No parameters found in ansatz")
             raise ValueError("No parameters found in ansatz string")
+    # Check for lambda in ansatz and remove it
+    if "lambda" in ansatz_str and ":" in ansatz_str:
+        lambda_start = ansatz_str.find("lambda")
+        colon_pos = ansatz_str.find(":", lambda_start)
+        if colon_pos > lambda_start:
+            logger.error(f"Removing lambda from ansatz: {ansatz_str[lambda_start:colon_pos+1]}. There shouldn't be a lambda in the ansatz. {ansatz_str}")
+            ansatz_str = ansatz_str[:lambda_start] + ansatz_str[colon_pos+1:]
+        else:
+            raise ValueError("Lambda expressions not allowed in ansatz")
     
     # Create complete lambda function string
     lambda_str = "lambda x,*params: " + ansatz_str

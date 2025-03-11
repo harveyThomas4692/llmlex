@@ -220,6 +220,42 @@ def check_key_usage(client):
         # Log and re-raise any exceptions
         logger.error(f"Error checking API key usage: {e}", exc_info=True)
         raise
+
+def check_credits_remaining(client):
+    '''
+    Checks the current credit balance for the provided API key.
+    Args:
+        client (object): An object containing the API key and base URL.
+    Returns:
+        float: The current credit balance for the API key if the request is successful.
+    '''
+    logger.debug("Checking API key credit balance")
+    
+    # Create request headers
+    headers = {"Authorization": f"Bearer {client.api_key}",}
+    try:
+        # Send request to check credit balance
+        logger.debug(f"Sending request to {client.base_url}/api/v1/auth/key")
+        response = requests.get(f"{client.base_url}/api/v1/auth/key", headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            # Extract and return credit balance data
+            data = response.json()["data"]
+            credit_limit = data.get("limit", 0)
+            credit_usage = data.get("usage", 0)
+            credit_balance = credit_limit - credit_usage if credit_limit is not None else "unlimited"
+            logger.info(f"API key credit balance check successful. Current balance: {credit_balance}")
+            return credit_balance
+        else:
+            # Log error and return response text
+            logger.error(f"API key credit balance check failed with status code {response.status_code}")
+            print(f"Request failed with status code {response.status_code}")
+            return response.text
+            
+    except Exception as e:
+        # Log and re-raise any exceptions
+        logger.error(f"Error checking API key credit balance: {e}", exc_info=True)
+        raise
     
 def get_prompt(function_list=None):
     """
@@ -420,4 +456,29 @@ async def async_call_model(client, model, image, prompt, system_prompt=None):
     except Exception as e:
         # Log and re-raise any exceptions
         logger.error(f"Error calling model {model} asynchronously: {e}", exc_info=True)
+        # Check for insufficient credits error (code 402)
+        is_credit_error = (
+            (hasattr(e, 'code') and e.code == 402) or
+            (isinstance(e, dict) and 'error' in e and 'code' in e['error'] and e['error']['code'] == 402) or
+            (str(e).find("402") != -1 and str(e).find("Insufficient credits") != -1)
+        )
+        
+        if is_credit_error:
+            logger.warning("Insufficient credits error detected. Pausing execution...")
+            import time
+            
+            # Pause and poll for credits
+            while True:
+                logger.info("Waiting for credits to be added. Will check again in 60 seconds.")
+                time.sleep(60)
+                
+                try:
+                    # Check if credits have been added
+                    logger.info("Checking if credits have been added...")
+                    if check_credits_remaining(client) > 1 or check_credits_remaining(client) == "unlimited":
+                        logger.info("Credits added. Resuming execution.")
+                        return await async_call_model(client, model, image, prompt, system_prompt)
+                except Exception as credit_check_error:
+                    logger.error(f"Error checking credits: {credit_check_error}")
+        
         raise

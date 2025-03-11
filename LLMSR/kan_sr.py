@@ -21,58 +21,81 @@ from sympy import symbols, simplify
 import sympy as sp
 import LLMSR.llmSR as llmSR
 from sympy import sin, cos, exp, log, sqrt, sinh, cosh, tanh
+from sympy.printing.numpy import NumPyPrinter
+from LLMSR.fit import get_chi_squared, fit_curve_with_guess
 
 # Mapping dictionaries for function conversion
 numpy_to_sympy = {
-    'sin': sympy.sin,
-    'cos': sympy.cos,
-    'tan': sympy.tan,
-    'exp': sympy.exp,
-    'log': sympy.log,
-    'sqrt': sympy.sqrt,
-    'abs': sympy.Abs,
-    'arcsin': sympy.asin,
-    'arccos': sympy.acos,
-    'arctan': sympy.atan,
-    'sinh': sympy.sinh,
-    'cosh': sympy.cosh,
-    'tanh': sympy.tanh,
-    'arcsinh': sympy.asinh,
-    'arccosh': sympy.acosh,
-    'arctanh': sympy.atanh,
-    'max': sympy.Max,
-    'min': sympy.Min,
-    'maximum': sympy.Max,
-    'minimum': sympy.Min,
-    'abs': sympy.Abs,
-    'heaviside': sympy.Heaviside
+    'sin': sp.sin,
+    'cos': sp.cos,
+    'tan': sp.tan,
+    'exp': sp.exp,
+    'log': sp.log,
+    'sqrt': sp.sqrt,
+    'abs': sp.Abs,
+    'arcsin': sp.asin,
+    'arccos': sp.acos,
+    'arctan': sp.atan,
+    'atan2': sp.atan2,
+    'atanh': sp.atanh,
+    'atan': sp.atan,
+    'sinh': sp.sinh,
+    'cosh': sp.cosh,
+    'tanh': sp.tanh,
+    'arcsinh': sp.asinh,
+    'arccosh': sp.acosh,
+    'arctanh': sp.atanh,
+    'max': sp.Max,
+    'min': sp.Min,
+    'maximum': sp.Max,
+    'minimum': sp.Min,
+    'heaviside': sp.Heaviside,
+    'power': sp.Pow,
+    'gamma': sp.gamma,
+    'Gamma': sp.gamma,
+    'factorial': sp.factorial,
+    'Factorial': sp.factorial,
+    'erf': sp.erf,
+    'Erf': sp.erf,
+    'erfc': sp.erfc,
+    'Erfc': sp.erfc,
 }
 
-sympy_to_numpy = {
-    'sin': "np.sin",
-    'cos': "np.cos",
-    'tan': "np.tan",
-    'exp': "np.exp",
-    'log': "np.log",
-    'sqrt': "np.sqrt",
-    'Abs': "np.abs",
-    'asin': "np.arcsin",
-    'acos': "np.arccos",
-    'atan': "np.arctan",
-    'sinh': "np.sinh",
-    'cosh': "np.cosh",
-    'tanh': "np.tanh",
-    'asinh': "np.arcsinh",
-    'acosh': "np.arccosh",
-    'atanh': "np.arctanh",
-    'pi': "np.pi",
-    'Max': "np.max",
-    'Min': "np.min",
-    'Max': "np.max",
-    'Min': "np.min",
-    'Abs': "np.abs",
-    'Heaviside': "np.heaviside"
-}
+# sympy_to_numpy = {
+ 
+#     'sin': "np.sin",
+#     'cos': "np.cos",
+#     'tan': "np.tan",
+#     'exp': "np.exp",
+#     'log': "np.log",
+#     'sqrt': "np.sqrt",
+#     'Abs': "np.abs",
+#     'asin': "np.arcsin",
+#     'acos': "np.arccos",
+#     'atan': "np.arctan",
+#     'sinh': "np.sinh",
+#     'cosh': "np.cosh",
+#     'tanh': "np.tanh",
+#     'asinh': "np.arcsinh",
+#     'acosh': "np.arccosh",
+#     'atanh': "np.arctanh",
+#     'pi': "np.pi",
+#     'Max': "np.max",
+#     'Min': "np.min",
+#     'Max': "np.max",
+#     'Min': "np.min",
+#     'Abs': "np.abs",
+#     'Heaviside': "np.heaviside",
+#     'Pow': "np.power",
+#     'gamma': "np.gamma",
+#     'Gamma': "np.gamma",
+#     'factorial': "np.math.factorial",
+#     'Factorial': "np.math.factorial",
+#     'erf': "np.math.erf",
+#     'Erf': "np.math.erf",
+#     'erfc': "np.math.erfc",
+#     'Erfc': "np.math.erfc",
+# }
 
 
 def create_kan_model(width, grid, k, seed=17, symbolic_enabled=False, device='cpu'):
@@ -147,26 +170,52 @@ def subst_params(a, p):
 #         print(f"Error simplifying expression: {e}, formula was: {formula}")
 #         return formula
 
-def simplify_expression(formula, N=3):
+def convert_sympy_to_numpy(expr):
+    expr_str = NumPyPrinter().doprint(expr)
+    
+    # First convert any 'numpy.' to 'np.' to standardize
+    expr_str = re.sub(r'numpy\.', 'np.', expr_str)
+    
+    # Find functions that don't have np. prefix
+    unknown_functions = re.findall(r'(?<!np\.)\b\w+(?=\()', expr_str)
+    
+    for func in unknown_functions:
+        # Skip functions that are already prefixed or are part of a prefixed function
+        if func not in ['np', 'numpy'] and not func.startswith('np.') and not func.startswith('numpy.'):
+            # Make sure we're not adding prefix to something that's already part of a prefixed function
+            expr_str = re.sub(r'(?<!np\.)\b' + func + r'\b(?=\()', f'np.{func}', expr_str)
+    
+    return re.sub(r'lambda[^:]*:', '', expr_str)
+
+def simplify_expression(formula, N=10):
     """
-    Simplify a mathematical expression using sympy.
+    Simplify a mathematical expression using sympy. Converts to sympy expression first.
     
     Args:
         formula: The formula to simplify
-        N: Number of simplification iterations
     """
     # Define symbolic variables and functions
     variables = symbols(f'x0:{N+1}')
     used_functions = {name: numpy_to_sympy[name] for name in numpy_to_sympy if f'{name}' in formula}
     safe_dict = {f'x{i}': variables[i] for i in range(N+1)}
     safe_dict.update(used_functions)  # Add only used symbolic functions
+    safe_dict.update({'sp':sp})
     try:
-        expr = simplify(eval(formula.replace("np.", ""), safe_dict))  # Remove "np." prefix for SymPy functions
+        formula = formula.replace("np.", "") # Remove "np." prefix for SymPy functions
+        for key, value in numpy_to_sympy.items():
+            # Replace function names with their sympy equivalents, but avoid replacing if already prefixed with sp.
+            formula = re.sub(r'(?<!sp\.)\b' + key + r'\b(?=\()', "sp." + value.__name__, formula, flags=re.IGNORECASE)
+        # Find all unknown functions in the formula without 'sp.' prefix
+        unknown_functions = re.findall(r'(?<!sp\.)\b\w+\b(?=\()', formula)
+        for func in unknown_functions:
+            if func not in safe_dict:
+                safe_dict[func] = sp.Function(func)
+        print("simplifying", formula, "with", safe_dict)
+        expr = simplify(eval(formula, safe_dict)) 
     except Exception as e:
         print(f"Error simplifying expression: {e}, formula was: {formula}")
         raise e
-    return str(expr)
-
+    return str(expr)#removes the sp. prefix
 
 
 def replace_floats_with_params(expr_str):
@@ -187,15 +236,21 @@ def replace_floats_with_params(expr_str):
     
     return expr_str, param_values
 
-def fit_curve(x, y, curve, params_initial):
-    params_opt, _ = curve_fit(curve, x, y, p0=params_initial)
-    residuals = y - curve(x, *params_opt)
-    chi_squared = np.mean((residuals ** 2) / (np.square(curve(x, *params_opt))+1e-6))
-    return params_opt, chi_squared 
-
-def call_model_simplify(client, ranges, expr, gpt_model="openai/gpt-4o", system_prompt=None):
-    """Call LLM to simplify a mathematical expression within specified ranges."""
-    if system_prompt is None:
+def call_model_simplify(client, ranges, expr, gpt_model="openai/gpt-4o", system_prompt=None, sympy=True, numpy=False):
+    """Call LLM to simplify a mathematical expression within specified ranges.
+    
+    Args:
+        client: OpenAI client or compatible client
+        ranges: Tuple of (min, max) values for the interval
+        expr: The expression to simplify
+        gpt_model: The GPT model to use
+        system_prompt: The system prompt to use. If None or 'default', a default prompt is used.
+        sympy: Whether to use sympy
+        numpy: Whether to use numpy
+    """
+    if sympy and numpy:
+        raise ValueError("Cannot specify both sympy and numpy as True.")
+    if system_prompt is None or system_prompt == "default":
         system_prompt = (
             "You are a mathematical simplification expert. Simplify the given function over the specified interval."
             "\n\nConsider these simplification strategies:"
@@ -206,8 +261,11 @@ def call_model_simplify(client, ranges, expr, gpt_model="openai/gpt-4o", system_
             "\n\nYour response must follow this format exactly:"
             "\n```simplified_expression\n[your simplified expression here]\n```"
             "\nOnly include the simplified expression inside the delimiters, nothing else. Do not include the square brackets used in the format specification, any other text, or placeholders."
-            "\nThe simplified expression should be a valid mathematical expression that can be evaluated."
+            f"\nThe simplified expression should be a valid mathematical expression in {'sympy' if sympy else 'numpy'} that can be evaluated."
         )
+        print("using default system prompt for LLM simplification")
+    else:
+        print("using provided system prompt for LLM simplification")
     
     prompt = (
         f"Please simplify this mathematical expression:\n\n"
@@ -296,7 +354,7 @@ def build_expression_tree(model, symb_expr_sorted, top_k=3):
             # Clean up the ansatz string.
             ansatz = candidate['ansatz'].replace('*x', ' * x') \
                                         .replace('(x)', '(1. * x)') \
-                                        .replace('-x', '-1. * x').strip()
+                                        .replace('-x', '-1. * x').replace('x,',' x ,').replace('(x', '( x').replace('x)', 'x )').replace('/x', '/ x').strip()
             if "lambda" in ansatz:
                 continue  # Skip lambda functions.
                 
@@ -346,7 +404,7 @@ def build_expression_tree(model, symb_expr_sorted, top_k=3):
             n_count = len([x for x in node_tree.keys() if x[0] == l])
             for n in range(n_count):
                 res = res.replace(f'x[{l},{n}]', f'({node_tree[(l, n)]})')
-        full_expressions.append(simplify_expression(res, pruned_model.width_in[0] - 1))
+        full_expressions.append(simplify_expression(res, pruned_model.width_in[0] - 1))# sympy expression
     
     return {
         "edge_dict": edge_dict,
@@ -355,7 +413,8 @@ def build_expression_tree(model, symb_expr_sorted, top_k=3):
         "full_expressions": full_expressions
     }
 
-def optimize_expression(client, node_tree, gpt_model, x_data, y_data, custom_system_prompt=None, original_f = None, KAN_model = None):
+
+def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, custom_system_prompt=None, original_f = None, prune_small_terms =True ):
     """
     Optimize and simplify the final expressions.
     
@@ -367,42 +426,47 @@ def optimize_expression(client, node_tree, gpt_model, x_data, y_data, custom_sys
     
     Args:
         client: OpenAI client or a compatible client.
-        node_tree: Dictionary containing the expression tree and 'full_expression' list.
+        full_expressions: List of full expressions, or just a single expression.
         gpt_model: Model to use for LLM simplification.
         x_data: x data points (numpy array).
         y_data: y data points (numpy array).
         custom_system_prompt: (Optional) Custom system prompt for LLM.
+        original_f: (Optional) Original function.
+        prune_small_terms: (Optional) Whether to prune small terms. If set to True, the threshold is 1e-6. If set to a float, the threshold is that float.
         
     Returns:
         Dictionary with key 'final_expressions' containing the final refined expressions.
     """
-    # Use full expressions if available; otherwise default to the output from the final layer.
-    if "full_expressions" in node_tree:
-        full_expressions = node_tree["full_expressions"]
-    else:
-        raise ValueError("No full expression found in node_tree")
     
     # if custom_system_prompt is None:
     #     custom_system_prompt = """
     #     You are a physics assistant. Your task is to simplify mathematical 
     #     expressions as much as possible while preserving their meaning.
     #     """
-    
+    # Handle case where full_expressions is a single expression
+    if isinstance(full_expressions, dict) and "full_expressions" in full_expressions:
+        full_expressions = full_expressions["full_expressions"]
+    elif not isinstance(full_expressions, list):
+        full_expressions = [full_expressions]
+    Ninputs = x_data.shape[-1] if len(x_data.shape) > 1 else 1
+
     ranges = (float(np.min(x_data)), float(np.max(x_data)))
-    final_expressions = []
-    simplified_expressions = []
-    chi_squared_finals = []
-    chi_squared_simplified = []
-    best_chi_squared = float('inf')
-    best_expression = None
-    best_expression_index = None
     fig, ax = plt.subplots()
+    results_all_dicts = []
     
     for i, expr in enumerate(full_expressions):
+        final_KAN_expressions = []
+        chi_squared_KAN_finals = []
+        final_LLM_expressions = []
+        chi_squared_LLM_finals = []
+        best_chi_squared = float('inf')
+        best_expression = None
+        best_expression_index = None
+        best_fit_type = None  # Track the type of the best fit
         print("###################################################")
         print(f"Simplifying output {i}")
         print("KAN expression (raw):\n", expr)
-        f_fitted = lambda x0: eval(expr)
+        f_fitted =eval("lambda x0: "+convert_sympy_to_numpy(expr), {"np": np})
         xs = np.arange(min(x_data), max(x_data), (max(x_data)-min(x_data))/100)
         try:
             try:
@@ -413,94 +477,137 @@ def optimize_expression(client, node_tree, gpt_model, x_data, y_data, custom_sys
             print(f"Original function 'f' not defined; skipping original plot {e}")
         ax.plot(xs, [f_fitted(x) for x in xs], label="KANSR (raw)")
         ax.legend()
+        # Calculate chi-squared for the raw expression
+        try:
+            raw_chi_squared = get_chi_squared(x_data, y_data, f_fitted, [])
+            print(f"Raw expression chi-squared: {raw_chi_squared:.4e}")
+            # Initialize best values with the raw expression
+            best_chi_squared = raw_chi_squared
+            best_expression = expr
+            best_expression_index = i
+            best_fit_type = "raw"  # Initial best fit is the raw expression
+        except Exception as e:
+            print(f"Error calculating raw chi-squared: {e}")
+            best_chi_squared = float('inf')
+            best_expression = None
+            best_expression_index = None
+            best_fit_type = None
     
         # Prune and simplify: replace floats with parameters (round coefficients to 4 digits) then simplify.
         expr = simplify_expression(subst_params(*replace_floats_with_params(expr)),
-                                   KAN_model.width_in[0] - 1)
-        simplified_expressions.append(expr)
+                                   Ninputs)
         print("KAN expression (simplified):\n", expr)
     
         # Refit parameters.
-        curve_ansatz_str, params_initial = replace_floats_with_params(expr)
-        for k, v in sympy_to_numpy.items():
-            curve_ansatz_str = curve_ansatz_str.replace(k, v)
-
-        print("replaced", curve_ansatz_str)
-        
-        curve_ansatz = "lambda x0, *params: " + curve_ansatz_str
-        curve = eval(curve_ansatz, {"np": np})
+        expr_np = convert_sympy_to_numpy(expr)
+        curve_ansatz_str_np, params_initial = replace_floats_with_params(expr_np)
+        print("Converted to numpy, and replaced the new floats with 'params': ", curve_ansatz_str_np)
+        curve_ansatz_np = "lambda x0, *params: " + curve_ansatz_str_np
+        curve_np = eval(curve_ansatz_np, {"np": np})
         try:
-            params_opt, chi_squared = fit_curve(x_data, y_data,
-                                                curve, params_initial)
-            print(f"Refitting: {curve_ansatz_str} - so after simplification gave a chi^2 of {chi_squared:.4e}")
-            chi_squared_simplified.append(chi_squared)
+            try:
+                params_opt, chi_squared = fit_curve_with_guess(x_data, y_data,
+                                                    curve_np, params_initial, try_all_methods=True, log_everything=True)
+            except RuntimeError as e:
+                #print(f"Refitting failed: {e}. Trying with random initial parameters...")
+                # Generate random initial parameters within a reasonable range
+                random_params = np.random.uniform(-1.0, 1.0, len(params_initial))
+                params_opt, chi_squared = fit_curve_with_guess(x_data, y_data,
+                                                    curve_np, random_params, try_all_methods=True, log_everything=True)
+            print(f"Refitting: {curve_ansatz_str_np} - so after simplification and refitting gave a chi^2 of {chi_squared:.4e}")
+            #simplified_expressions.append(expr)
+            #chi_squared_simplified.append(chi_squared)
             
             # Track best chi-squared
             if chi_squared < best_chi_squared:
                 best_chi_squared = chi_squared
-                best_expression = simplify_expression(subst_params(curve_ansatz_str, params_opt),
-                                                     KAN_model.width_in[0] - 1)
+                best_expression = simplify_expression(subst_params(curve_ansatz_str_np, params_opt), Ninputs) 
                 best_expression_index = i
+                best_fit_type = "KANsimplified"  # Best fit is from KAN simplification
         except RuntimeError as e:
-            print("Proceeding with unoptimized parameters {e}")
             params_opt = params_initial
-            chi_squared_simplified.append(float('inf'))
-    
+            chi_squared = get_chi_squared(x_data, y_data, curve_np, params_opt)
+            print(f"All fits failed, proceeding with unoptimized parameters {e}, chi-squared with unoptimized parameters: {chi_squared:.4e}")
         # Prune and simplify the refitted model.
-        expr = simplify_expression(subst_params(curve_ansatz_str, params_opt),
-                                   KAN_model.width_in[0] - 1)
-        print("KAN expression (final):\n", expr)
-        final_expressions.append(expr)
+        if prune_small_terms:
+            prune_amount = 1e-6 if prune_small_terms==True else prune_amount
+            print(f"Pruning small terms, smaller than {prune_amount}")
+            params_opt = [p if abs(p) > prune_amount else 0 for p in params_opt]
+
+        expr_sp = simplify_expression(subst_params(curve_ansatz_str_np, params_opt), Ninputs)
+        print("KAN expression (final):\n", expr_sp)
+        final_KAN_expressions.append(expr_sp)
+        chi_squared_KAN_finals.append(chi_squared)
     
         # Plot comparison.
-        f_fitted = lambda x0: eval(expr)
+        f_fitted = eval("lambda x0: "+convert_sympy_to_numpy(expr_sp), {"np": np})
         ax.plot(xs, [f_fitted(x) for x in xs], label="KANSR (refitted)")
     
         # Ask LLM to further simplify the result and refit.
         try:
-            expr = call_model_simplify(client, ranges, expr, gpt_model, system_prompt=custom_system_prompt)
-            logger.info(f"LLM improvement response is: {expr}")
-            curve_ansatz_str, params_initial = replace_floats_with_params(expr)
-            curve_ansatz = "lambda x0, *params: " + curve_ansatz_str
-            curve = eval(curve_ansatz, {"np": np})
+            expr_llm = call_model_simplify(client, ranges, expr_sp, gpt_model, system_prompt=custom_system_prompt, sympy=True, numpy=False)
+            print(f"LLM improvement response is: {expr_llm}")
+            curve_ansatz_str_np, params_initial = replace_floats_with_params(convert_sympy_to_numpy(expr_llm))
+            curve_ansatz_np = "lambda x0, *params: " + curve_ansatz_str_np
+            curve_np = eval(curve_ansatz_np, {"np": np})
             
-            params_opt, chi_squared = fit_curve(x_data, y_data,
-                                                curve, params_initial)
-            chi_squared_finals.append(chi_squared)
+            try:
+                params_opt, chi_squared = fit_curve_with_guess(x_data, y_data,
+                                                    curve_np, params_initial, try_all_methods=True, log_everything=True)
+            except RuntimeError as e:
+                print(f"Refitting failed: {e}. Trying with random initial parameters...")
+                # Generate random initial parameters within a reasonable range
+                random_params = np.random.uniform(-1.0, 1.0, len(params_initial))
+                params_opt, chi_squared = fit_curve_with_guess(x_data, y_data,
+                                                    curve_np, random_params, try_all_methods=True, log_everything=True)
+            final_LLM_expressions.append(expr_llm)
+            chi_squared_LLM_finals.append(chi_squared)
             print(f"LLM improvement gave a chi^2 of {chi_squared:.4e}")
-            
-            # Track best chi-squared
+            if prune_small_terms:
+                print(f"Pruning small terms, smaller than {prune_amount}")
+                params_opt = [p if abs(p) > prune_amount else 0 for p in params_opt]
+                expr_final_sp = simplify_expression(subst_params(curve_ansatz_str_np, params_opt), Ninputs)
+            else:
+                expr_final_sp = simplify_expression(subst_params(curve_ansatz_str_np, params_opt), Ninputs)
+            chi_squared = get_chi_squared(x_data, y_data, curve_np, params_opt)
             if chi_squared < best_chi_squared:
                 best_chi_squared = chi_squared
-                best_expression = simplify_expression(subst_params(curve_ansatz_str, params_opt),
-                                                     KAN_model.width_in[0] - 1)
+                best_expression = expr_final_sp
                 best_expression_index = i
-            expr = simplify_expression(subst_params(curve_ansatz_str, params_opt),
-                                       KAN_model.width_in[0] - 1)
-            f_fitted = lambda x0: eval(expr)
+                best_fit_type = "LLMsimplified"  # Best fit is from LLM simplification
+
+            # Track best chi-squared
+            f_fitted = eval("lambda x0: "+convert_sympy_to_numpy(expr_final_sp), {"np": np})
             ax.plot(xs, [f_fitted(x) for x in xs], label="KANSR (final)")
+            print('Final LLM response, simplified and refitted: ', expr_final_sp)
         except Exception as e:
             print(f"Skipping LLM improvement. {e}")
-            chi_squared_finals.append(chi_squared)
+            final_LLM_expressions.append(None)
+            chi_squared_LLM_finals.append(None)
     
         ax.legend()
         plt.show()
-        print("##################\n# Final formula: #\n##################\n", expr)
+        print(f"###############################\n# Final formula for output {i}: #\n###############################\n {best_expression} with a chi^2 of {best_chi_squared:.3e} and from the {best_fit_type} fit (of raw/KANsimplified/LLMsimplified)")
     
-    result_dict = {
-        'raw_expressions': full_expressions,
-        'simplified_expressions': simplified_expressions,
-        'final_expressions': final_expressions,
-        'chi_squared_finals': chi_squared_finals,
-        'chi_squared_simplified': chi_squared_simplified,
-        'best_expression': best_expression,
-        'best_chi_squared': best_chi_squared,
-        'best_expression_index': best_expression_index
-    }
-    
-    return best_expression, result_dict
+        result_dict = {
+            'raw_expression': expr,
+            'final_KAN_expression': final_KAN_expressions,
+            'chi_squared_KAN_final': chi_squared_KAN_finals,
+            'final_LLM_expression': final_LLM_expressions,
+            'chi_squared_LLM_final': chi_squared_LLM_finals,
+            'best_expression': best_expression,
+            'best_chi_squared': best_chi_squared,
+            'best_expression_index': best_expression_index,
+            'best_fit_type': best_fit_type  # Add the type of the best fit
+        }
+        results_all_dicts.append(result_dict)
 
-def plot_results(f, ranges, result_dict, title="KAN Symbolic Regression Results"):
+    best_expressions = [result_dict['best_expression'] for result_dict in results_all_dicts]
+    best_chi_squareds = [result_dict['best_chi_squared'] for result_dict in results_all_dicts]
+    
+    return best_expressions, best_chi_squareds, results_all_dicts
+
+def plot_results(f, ranges, result_dict, model = None, pruned_model = None, title="KAN Symbolic Regression Results"):
     """
     Plot the original function and the approximations.
     
@@ -508,6 +615,8 @@ def plot_results(f, ranges, result_dict, title="KAN Symbolic Regression Results"
         f: Original function
         ranges: Tuple of (min_x, max_x) for the input range
         result_dict: Dictionary with results from optimize_expression
+        model: KAN model
+        pruned_model: Pruned KAN model
         title: Plot title
         
     Returns:
@@ -515,14 +624,6 @@ def plot_results(f, ranges, result_dict, title="KAN Symbolic Regression Results"
     """
     x = np.linspace(ranges[0], ranges[1], 1000)
     y_true = f(torch.tensor(x).reshape(-1, 1).float()).numpy().flatten()
-    
-    # Create a function to evaluate expressions
-    def eval_expr(expr_str, x_vals):
-        y_vals = []
-        for x_val in x_vals:
-            x0 = x_val  # Variable name used in expressions
-            y_vals.append(eval(expr_str))
-        return np.array(y_vals)
     
     # Create the plot
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -536,7 +637,7 @@ def plot_results(f, ranges, result_dict, title="KAN Symbolic Regression Results"
     
     # Try to plot the best expression
     try:
-        y_best = eval_expr(best_expr, x)
+        y_best = eval(convert_sympy_to_numpy(best_expr), {"np": np, "x0": x})
         ax.plot(x, y_best, 'r--', label=f'Best Expression (χ²={best_chi_squared:.5e})', linewidth=2)
     except Exception as e:
         print(f"Error plotting best expression: {e}")
@@ -544,13 +645,30 @@ def plot_results(f, ranges, result_dict, title="KAN Symbolic Regression Results"
     # Try to plot the simplified expression
     try:
         best_idx = result_dict['best_expression_index']
-        simplified_expr = result_dict['simplified_expressions'][best_idx]
-        chi_squared = result_dict['chi_squared_simplified'][best_idx]
+        raw_expr = result_dict['raw_expression']
+        y_raw = eval(convert_sympy_to_numpy(raw_expr), {"np": np, "x0": x})
+        ax.plot(x, y_raw, 'k--', label=f'Raw expression from LLMSR', linewidth=2)
+
+
+        simplified_by_KAN_expr = result_dict['final_KAN_expression'][best_idx]
+        chi_squared = result_dict['chi_squared_KAN_final'][best_idx]
+        y_simplified = eval(convert_sympy_to_numpy(simplified_by_KAN_expr), {"np": np, "x0": x})
+        ax.plot(x, y_simplified, 'g-.', label=f'Simplified by KAN (χ²={chi_squared:.5e})', linewidth=2)
+
+        simplified_by_LLM_expr = result_dict['final_LLM_expression'][best_idx]
+        chi_squared = result_dict['chi_squared_LLM_final'][best_idx]
         
-        y_simplified = eval_expr(simplified_expr, x)
-        ax.plot(x, y_simplified, 'g-.', label=f'Simplified (χ²={chi_squared:.5e})', linewidth=2)
+        y_simplified = eval(convert_sympy_to_numpy(simplified_by_LLM_expr), {"np": np, "x0": x})
+        ax.plot(x, y_simplified, 'g-.', label=f'Simplified by LLM and refitted (χ²={chi_squared:.5e})', linewidth=2)
     except Exception as e:
         print(f"Error plotting simplified expression: {e}")
+    # Try to plot the model and pruned model predictions
+    if model is not None:
+        model_preds = model(torch.tensor(x).reshape(-1, 1).float()).detach().numpy().flatten()
+        ax.plot(x, model_preds, 'b:', label='KAN Model', linewidth=2)
+    if pruned_model is not None:
+        pruned_preds = pruned_model(torch.tensor(x).reshape(-1, 1).float()).detach().numpy().flatten()
+        ax.plot(x, pruned_preds, 'm:', label='Pruned KAN Model', linewidth=2)
     
     ax.set_title(title)
     ax.set_xlabel('x')
@@ -563,9 +681,10 @@ def plot_results(f, ranges, result_dict, title="KAN Symbolic Regression Results"
 
 def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid=7, k=3, 
                          train_steps=50, generations=3, gpt_model="openai/gpt-4o", device='cpu',
-                         node_th=0.2, edge_th=0.2, custom_system_prompt_for_second_simplification=None, optimizer="LBFGS", population=10, temperature=0.1, exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False):
+                         node_th=0.2, edge_th=0.2, custom_system_prompt_for_second_simplification=None, optimizer="LBFGS", population=10, temperature=0.1,
+                        exit_condition=None, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False):
     """
-    Run the complete KAN symbolic regression pipeline.
+    Run the complete KAN symbolic regression pipeline on a univariate function.
     
     Args:
         client: OpenAI client or compatible client
@@ -589,58 +708,83 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
         - 'train_loss': Training loss
         - 'symbolic_expressions': Symbolic expressions
         - 'node_tree': Node tree
-        - 'result': Result dictionary
+        - 'result_dict': Result dictionary
     """
+    # Validate input architecture
+    if width[0] != 1:
+        raise ValueError(f"First layer width must be 1 for univariate function, got {width[0]}")
     # 1. Create the model
-    model = create_kan_model(width, grid, k, device=device)
-    
-    # 2. Create the dataset
-    dataset = create_dataset(f, n_var=1, ranges=ranges, train_num=10000, test_num=1000, device=device)
+    try:
+        model = create_kan_model(width, grid, k, device=device)
+        
+        # 2. Create the dataset
+        dataset = create_dataset(f, n_var=1, ranges=ranges, train_num=10000, test_num=1000, device=device)
 
-           # Train the model
-    res = model.fit(dataset, opt=optimizer, steps=train_steps)
-    
-    # Prune the model
-    pruned_model = model.prune(node_th=node_th, edge_th=edge_th)
+        # Train the model
+        res = model.fit(dataset, opt=optimizer, steps=train_steps)
+        
+        # Prune the model
+        pruned_model = model.prune(node_th=node_th, edge_th=edge_th)
 
-    print("Trained model:")
-    model.plot()
-    print("Pruned model:")
-    pruned_model.plot()
-    train_loss = res['train_loss']
-    # 4. Convert to symbolic expressions
-    res = llmSR.kan_to_symbolic(pruned_model, client, population=population, generations=generations, temperature=temperature, gpt_model=gpt_model,
-                                exit_condition=min(train_loss).item(), verbose=verbose, use_async=use_async, plot_fit=plot_fit, plot_parents=plot_parents)
-    symb_expr_sorted = sort_symb_expr(res)
-    
-    # 5. Build expression tree
-    node_data = build_expression_tree(pruned_model, symb_expr_sorted, top_k=3)
-    # 6. Optimize expression
-    # Convert training data to numpy arrays for optimization
-    x_data = dataset['train_input'].cpu().numpy().flatten()
-    y_data = dataset['train_label'].cpu().numpy().flatten()
-    # Optimize and simplify the expression
-    best_expression, result_dict = optimize_expression(
-        client, node_data, gpt_model, x_data, y_data, 
-        custom_system_prompt=custom_system_prompt_for_second_simplification, original_f=f, KAN_model=pruned_model
-    )
+        print("Trained model:")
+        model.plot()
+        print("Pruned model:")
+        pruned_model.plot()
+        train_loss = res['train_loss']
+        # 4. Convert to symbolic expressions
+        res = llmSR.kan_to_symbolic(pruned_model, client, population=population, generations=generations, temperature=temperature, gpt_model=gpt_model,
+                                    exit_condition=exit_condition if exit_condition is not None else min(train_loss).item(), verbose=verbose, use_async=use_async, plot_fit=plot_fit, plot_parents=plot_parents, demonstrate_parent_plotting=demonstrate_parent_plotting)
+        symb_expr_sorted = sort_symb_expr(res)
+        
+        # 5. Build expression tree
+        node_data = build_expression_tree(pruned_model, symb_expr_sorted, top_k=3)
+        # 6. Optimize expression
+        # Convert training data to numpy arrays for optimization
+        x_data = dataset['train_input'].cpu().numpy().flatten()
+        y_data = dataset['train_label'].cpu().numpy().flatten()
+        # Optimize and simplify the expression
+        best_expressions, best_chi_squareds, result_dicts = optimize_expression(
+            client, node_data, gpt_model, x_data, y_data, 
+            custom_system_prompt=custom_system_prompt_for_second_simplification, original_f=f, prune_small_terms=True
+        )
+        result_dict = result_dicts[0]
 
-    # Print the results
-    best_index = result_dict['best_expression_index']
-    print(f"best expression: {result_dict['best_expression']}, at index {best_index}, with chi^2 {result_dict['best_chi_squared']}")
-    print(f"initially: {result_dict['raw_expressions'][best_index]}")
-    print(f"then simplified: {result_dict['simplified_expressions'][best_index]}, chi^2 {result_dict['chi_squared_simplified'][best_index]}")
-    print(f"then refitted: {result_dict['final_expressions'][best_index]}, chi^2 {result_dict['chi_squared_finals'][best_index]}")
-
-    # 7. Combine everything into a results dictionary
-    return {
-        'trained_model': model,
-        'pruned_model': pruned_model,
-        'train_loss': train_loss,
-        'symbolic_expressions': symb_expr_sorted,
-        'node_tree': node_data,
-        'result': result_dict,
-        'dataset': dataset,
-        'best_expression': best_expression,
-        'best_chi_squared': result_dict['best_chi_squared']
-    }
+        # Print the results
+        best_index = result_dict['best_expression_index']
+        print(f"best expression: {result_dict['best_expression']}, at index {best_index}, with chi^2 {result_dict['best_chi_squared']}")
+        print(f"initially: {result_dict['raw_expression'][best_index]}")
+        print(f"refitting all coefficients in KAN: {result_dict['final_KAN_expression'][best_index]}, chi^2 {result_dict['chi_squared_KAN_final'][best_index]}")
+        print(f"simplifying by LLM and refitting again: {result_dict['final_LLM_expression'][best_index]}, chi^2 {result_dict['chi_squared_LLM_final'][best_index]}")
+        return {
+            'trained_model': model,
+            'pruned_model': pruned_model,
+            'train_loss': train_loss,
+            'symbolic_expressions': symb_expr_sorted,
+            'node_tree': node_data,
+            'result_dict': result_dict,
+            'dataset': dataset,
+            'best_expressions': best_expressions,
+            'best_chi_squareds': best_chi_squareds
+        }
+    except Exception as e:
+        # Return partial results based on what was completed
+        results = {}
+        if 'model' in locals():
+            results['trained_model'] = model
+        if 'pruned_model' in locals():
+            results['pruned_model'] = pruned_model
+        if 'train_loss' in locals():
+            results['train_loss'] = train_loss
+        if 'symb_expr_sorted' in locals():
+            results['symbolic_expressions'] = symb_expr_sorted
+        if 'node_data' in locals():
+            results['node_tree'] = node_data
+        if 'result_dict' in locals():
+            results['result_dict'] = result_dict
+        if 'dataset' in locals():
+            results['dataset'] = dataset
+        if 'best_expressions' in locals():
+            results['best_expressions'] = best_expressions
+            results['best_chi_squareds'] = best_chi_squareds
+        print(f"Error in pipeline: {e}, returning partial results: {list(results.keys())}")
+        return results

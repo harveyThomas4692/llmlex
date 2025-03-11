@@ -3,7 +3,7 @@ from scipy.optimize import curve_fit
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from LLMSR.images import generate_base64_image, generate_base64_image_with_parents
-from LLMSR.llm import get_prompt, call_model, async_rate_limit_api_call, clear_rate_limit_lock
+from LLMSR.llm import get_prompt, call_model, async_rate_limit_api_call, clear_rate_limit_lock, check_key_usage
 from LLMSR.response import extract_ansatz, fun_convert
 import logging
 import LLMSR.fit as fit
@@ -13,6 +13,7 @@ import importlib.util
 import time
 import re
 from LLMSR.response import APICallStats
+from LLMSR.fit import get_chi_squared
 
 # Check if nest_asyncio is available
 try:
@@ -360,7 +361,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
     Returns: 
         dict: Result dictionary or None if all attempts fail
     """
-    logger.debug(f"Starting async_single_call with model={model}, function_list size={len(function_list) if function_list else 0}")
+    logger.debug(f"Starting async_single_call with model={model}, function_list size={len(function_list) if function_list else 0}, plot_parents={plot_parents}")
     
     # Create a local stats tracker if none provided
     local_stats = stats is not None
@@ -377,8 +378,9 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
             # Get the proper prompt based on function_list
             prompt = get_prompt(function_list)
             if plot_parents:
-                prompt = "\n\nThe listed curve_# functions (faded and broken lines) are plotted on the same image as the data ( which is solid blue lines). The coefficients the curve_# functions are plotted with are optimised with gradient descent. Use this information to improve the ansatz." + prompt
-                logger.info(f"Generating plot for activation function with parents")
+                prompt = "\n\nThe listed curve_# functions (faded and broken lines) are plotted on the same image as the data ( which is solid blue lines).\
+                  The coefficients the curve_# functions are plotted with are optimised with gradient descent. Use this information to improve the ansatz." + prompt
+                logger.debug(f"Generating plot for activation function with parents")
                 img = generate_base64_image_with_parents(x, y, function_list)
             
             # Make the LLM call using our async rate-limited function
@@ -443,38 +445,23 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
                 try:
                     params, chi2 = fit.fit_curve(x, y, f, num_params)
                     stats.stage_success("curve_fitting")
+                    if chi2 == float('inf'):
+                        logger.debug(f"Curve fitting failed: chi2 is infinite {ansatz} {num_params} {f}")# already logged elsewhere
+                        continue
                 except Exception as e:
                     stats.stage_failure("curve_fitting", e)
                     last_error = e
                     logger.warning(f"Curve fitting failed: {e}")
                     continue
 
-                # Verify function returns correct shape for the input data
+                # Validate the function output
                 try:
-                    # Test with a small sample of the actual data
-                    test_x = x[:min(57, len(x))]
-                    test_y = f(test_x, *params)
-                    
-                    # Check if output shape matches input
-                    if test_y.shape != test_x.shape:
-                        logger.warning(f"Function output shape {test_y.shape} doesn't match input shape {test_x.shape}")
-                        # Try to reshape or broadcast if possible
-                        if np.isscalar(test_y) or len(test_y) == 1:
-                            # Handle scalar output by broadcasting
-                            logger.debug("Attempting to broadcast scalar output to match input shape")
-                            test_y = np.full_like(test_x, test_y)
-                        elif len(test_y) != len(test_x):
-                            raise ValueError(f"Function returns {len(test_y)} values for {len(test_x)} inputs")
-                    
-                    # Additional check for NaN or inf values
-                    if np.any(np.isnan(test_y)) or np.any(np.isinf(test_y)):
-                        logger.warning("Function returns NaN or inf values")
+                    validate_function_output(x, f, params, stats)
                 except Exception as e:
-                    stats.stage_failure("function_validation", e)
                     last_error = e
                     logger.warning(f"Function validation failed: {e}")
                     continue
-                
+
                 # If we got here, everything worked
                 logger.debug(f"Fit complete. Chi²: {chi2}, parameters: {params}")
                 stats.add_success()
@@ -521,7 +508,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
 
 def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                 temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5, system_prompt=None, 
-                elite=False, for_kan=False, use_async=True, plot_parents=False):
+                elite=False, for_kan=False, use_async=True, plot_parents=False, demonstrate_parent_plotting=False):
     """
         Run a genetic algorithm to fit a model to the given data.
         Parameters:
@@ -537,6 +524,8 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
             system_prompt (str, optional): The system prompt to use for the API calls. Default is None.
             elite (bool, optional): Whether to use elitism in the genetic algorithm. Default is False.
             use_async (bool, optional): Whether to use async calls for population generation. Default is True.
+            plot_parents (bool, optional): Whether to plot the parents in the genetic algorithm, showing the model the shape of the optimize parents. Default is False.
+            demonstrate_parent_plotting (bool, optional): Whether to show to the user an example of the parent plotting. Default is False.
         Returns:
             list: A list of populations, where each population is a list of individuals.
         """
@@ -544,6 +533,8 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
 
     logger.debug(f"Starting genetic algorithm with population_size={population_size}, generations={num_of_generations}, model={model}")
     logger.debug(f"Parameters: temperature={temperature}, exit_condition={exit_condition}, elite={elite}, for_kan={for_kan}")
+    if plot_parents:
+        logger.debug(f"Plotting parents in faded colours on the same image as the data.")
     
 
     
@@ -556,8 +547,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     logger.debug("Checking constant function as baseline")
     curve = lambda x, *params: params[0] * np.ones(len(x))
     params, _ = curve_fit(curve, x, y, p0=[1])
-    residuals = y - params[0]*np.ones(len(x))
-    chi_squared = np.mean((residuals ** 2) / (np.square(curve(x, *params))+1e-6))
+    chi_squared = get_chi_squared(x, y, curve, params)
 
     if chi_squared <= exit_condition:
         logger.info(f"Constant function meets exit condition and is a good fit - returning early. Score: {chi_squared}, constant: {params}")
@@ -567,7 +557,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         populations.append([{
             "params": params,
             "score": -chi_squared,
-            "ansatz": "lambda x,*params: params[0] * np.ones(len(x))" if for_kan else "params[0]",
+            "ansatz": "params[0]" if for_kan else "params[0]",
             "Num_params": 0,
             "response": None,
             "prompt": None,
@@ -657,11 +647,20 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         logger.error(error_msg)
         raise RuntimeError(error_msg)
     
-    # Handle NaN scores
+    # Handle NaN and infinite scores
     for p in population:
-        if np.isnan(np.sum(p['score'])):
-            logger.warning(f"Found NaN score, setting to -1e8")
-            p['score'] = -1e8
+        if not np.isfinite(p['score']):
+            # Find the minimum finite score to use as reference
+            finite_scores = [ind['score'] for ind in population if np.isfinite(ind['score'])]
+            if finite_scores:
+                min_score = min(finite_scores)
+                penalty = 1e2  # Smaller penalty to stay closer to original implementation
+                bad_score = min_score - penalty
+            else:
+                bad_score = -1e8  # Fallback to original value if no finite scores
+                
+            logger.warning(f"Found non-finite score {p['score']}, setting to {bad_score}")
+            p['score'] = bad_score
             
     population.sort(key=lambda x: x['score'])
     populations.append(population)
@@ -672,19 +671,33 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         logger.info("Exit condition met after initial population")
         return populations
 
+    if plot_parents and demonstrate_parent_plotting:
+        demo_func_list = [(pop['ansatz'], pop['params']) for pop in populations[-1][0:min(2, len(populations[-1]))]]
+        demo_image = generate_base64_image_with_parents(x, y, demo_func_list, fig=None, ax=None, actually_plot=True, title_override="Example of a plot with parents added")
     # Evolution loop
     for generation in range(num_of_generations-1):
         
         logger.debug("Computing selection probabilities")
         scores = np.array([ind['score'] for ind in population])
         finite_scores = scores[np.isfinite(scores)]
-        normalized_scores = (scores - np.min(finite_scores)) / (np.max(finite_scores) - np.min(finite_scores) + 1e-6)
-        exp_scores = np.exp((normalized_scores - np.max(normalized_scores))/temperature)
-        exp_scores = np.nan_to_num(exp_scores, nan=0.0)
-        if np.all(exp_scores == 0):
-            logger.warning("All selection probabilities are zero, using uniform distribution")
-            exp_scores = np.ones_like(exp_scores)
-        probs = exp_scores / np.sum(exp_scores)
+        
+        # Handle case where all scores might be non-finite
+        if len(finite_scores) == 0:
+            logger.warning("No finite scores found, using uniform selection probabilities")
+            probs = np.ones(len(scores)) / len(scores)
+        else:
+            normalized_scores = (scores - np.min(finite_scores)) / (np.max(finite_scores) - np.min(finite_scores) + 1e-6)
+            # Ensure normalized scores are finite
+            normalized_scores = np.nan_to_num(normalized_scores, nan=0.0, posinf=0.0, neginf=0.0)
+            
+            exp_scores = np.exp((normalized_scores - np.max(normalized_scores))/temperature)
+            exp_scores = np.nan_to_num(exp_scores, nan=0.0)
+            
+            if np.sum(exp_scores) < 1e-10:
+                logger.warning("All selection probabilities are effectively zero, using uniform distribution")
+                probs = np.ones_like(exp_scores) / len(exp_scores)
+            else:
+                probs = exp_scores / np.sum(exp_scores)
         
         logger.debug("Selecting parents for next generation")
         selected_population = [np.random.choice(populations[-1], size=2,
@@ -794,7 +807,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     return populations
 
 
-def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False):
+def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False):
     """
     Converts a given kan model symbolic representations using llmsr.
     Parameters:
@@ -810,6 +823,7 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
     Returns:
         - res_fcts (dict): A dictionary mapping layer, input, and output indices to their corresponding symbolic functions.
     """
+    start_usage = check_key_usage(client)    
     logger.debug(f"Starting KAN to symbolic conversion with population={population}, generations={generations}")
     logger.debug(f"KAN model has {len(model.width_in)} layers")
 
@@ -915,6 +929,17 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                                     curve, _ = fun_convert(highest_score_element['ansatz'])
                                     # Generate y values using the fitted function
                                     fitted_y = curve(x, *highest_score_element['params'])
+                                    # Check if fitted_y is a scalar or has different shape than x
+                                    if isinstance(fitted_y, (int, float, np.number)):
+                                        fitted_y = np.full_like(x, fitted_y)
+                                    elif np.isscalar(fitted_y) or len(fitted_y) == 1 or fitted_y.shape != x.shape:
+                                        # Handle case where fitted_y is array-like but wrong shape
+                                        if np.size(fitted_y) == 1:
+                                            # Single value in array
+                                            fitted_y = np.full_like(x, fitted_y.item() if hasattr(fitted_y, 'item') else fitted_y)
+                                        else:
+                                            # Try to reshape or broadcast
+                                            fitted_y = np.broadcast_to(fitted_y, x.shape)
                                     
                                     # Create a new figure for the fitted function
                                     fig2, ax2 = plt.subplots(figsize=(8,6))
@@ -940,6 +965,8 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
     # Log summary
     logger.info(f"KAN conversion complete: {total_connections} total connections")
     logger.info(f"Connection breakdown: {symbolic_connections} symbolic, {zero_connections} zero, {processed_connections} processed")
+    end_usage = check_key_usage(client)
+    logger.info(f"API key usage whilst this was running: ${end_usage - start_usage:.2f}")
     
     return res_fcts
 
@@ -1038,3 +1065,36 @@ def generate_learned_f(sym_expr):
     
     total_params = param_index
     return "\n".join(lines), total_params, np.array(best_params)
+
+                
+def validate_function_output(x, f, params, stats):
+    """
+    Validates that a function produces correct output shape for the input data.
+    
+    Args:
+        x: Input data array
+        f: Function to validate
+        params: Parameters for the function
+        stats: Statistics object for tracking failures
+    
+    Raises:
+        ValueError: If function output doesn't match input shape and can't be fixed
+    """
+    # Test with a small sample of the actual data
+    test_x = x[:min(57, len(x))]
+    test_y = f(test_x, *params)
+    
+    # Check if output shape matches input
+    if test_y.shape != test_x.shape:
+        logger.warning(f"Function output shape {test_y.shape} doesn't match input shape {test_x.shape}")
+        # Try to reshape or broadcast if possible
+        if np.isscalar(test_y) or len(test_y) == 1:
+            # Handle scalar output by broadcasting
+            logger.debug("Attempting to broadcast scalar output to match input shape")
+            test_y = np.full_like(test_x, test_y)
+        elif len(test_y) != len(test_x):
+            raise ValueError(f"Function returns {len(test_y)} values for {len(test_x)} inputs")
+    
+    # Additional check for NaN or inf values
+    if np.any(np.isnan(test_y)) or np.any(np.isinf(test_y)):
+        logger.warning("Function returns NaN or inf values")
