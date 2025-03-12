@@ -3,3 +3,13 @@ numpy
 tqdm
 openai
 matplotlib
+python-dotenv
+requests
+nest-asyncio
+pykan
+scikit-learn
+PyYAML
+torch
+pandas
+stopit
+setuptools

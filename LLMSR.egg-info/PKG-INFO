@@ -2,6 +2,7 @@ Metadata-Version: 2.2
 Name: LLMSR
 Version: 0.0.1
 Summary: An open source python library for symbolic regression with LLMs
+Home-page: https://github.com/harveyThomas4692/LLM_SR
 Author: Thomas R. Harvey
 Author-email: trharvey@mit.edu
 Classifier: Programming Language :: Python :: 3
@@ -14,11 +15,15 @@ Requires-Dist: numpy
 Requires-Dist: tqdm
 Requires-Dist: openai
 Requires-Dist: matplotlib
+Requires-Dist: python-dotenv
+Requires-Dist: requests
+Requires-Dist: nest-asyncio
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier
 Dynamic: description
 Dynamic: description-content-type
+Dynamic: home-page
 Dynamic: requires-dist
 Dynamic: summary
 
