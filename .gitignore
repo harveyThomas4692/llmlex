@@ -1,4 +1,3 @@
-.DS_Store
 # Keep CLAUDE.md in git
 CLAUDE.md
 
@@ -46,3 +45,12 @@ tests/test_data/test_plot.png
 
 # Output files
 *.log
+=======
+.ipynb_checkpoints/KAN_SR-checkpoint.ipynb
+LLMSR/.ipynb_checkpoints/llm-checkpoint.py
+LLMSR/.ipynb_checkpoints/llmSR-checkpoint.py
+/Examples/.ipynb_checkpoints
+/figures
+/LLMSR/.ipynb_checkpoints
+/LLMSR/__pycache__
+/model

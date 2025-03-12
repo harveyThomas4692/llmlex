@@ -844,7 +844,6 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     
     return populations
 
-
 def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False):
     """
     Converts a given kan model symbolic representations using llmsr.
@@ -854,7 +853,7 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
         population (int, optional): The population size for the genetic algorithm. Default is 10.
         generations (int, optional): The number of generations for the genetic algorithm. Default is 3.
         temperature (float, optional): The temperature parameter for the genetic algorithm. Default is 0.1.
-        gpt_model (str, optional): The GPT model to use for generating symbolic functions. Default is "openai/gpt-4o-mini".
+        llm_model (str, optional): The GPT model to use for generating symbolic functions. Default is "openai/gpt-4o-mini".
         exit_condition (float, optional): The exit condition for the genetic algorithm. Default is 1e-3.
         verbose (int, optional): Verbosity level for logging. Default is 0.
         use_async (bool, optional): Whether to use asynchronous processing for population generation. Default is True.
