@@ -175,9 +175,8 @@ def fun_convert(ansatz):
         raise
     
     logger.debug("Successfully converted ansatz to lambda function")
-    return curve, num_params
+    return curve, num_params, lambda_str
 
-    # Create a counter object to track API call statistics
 class APICallStats:
     def __init__(self):
         self.success_count = 0
@@ -215,6 +214,28 @@ class APICallStats:
             # Other errors
             "other": 0
         }
+        
+        # Track validation issues
+        self.validation_issues = {
+            "scalar_output": 0,       # Function returns scalar instead of array
+            "shape_mismatch": 0,      # Function returns wrong shape
+            "nan_values": 0,          # Function returns NaN values
+            "inf_values": 0,          # Function returns inf values
+            "evaluation_error": 0,    # General errors in function evaluation
+            "other_validation": 0     # Other validation issues
+        }
+        
+        # Track fitting warnings
+        self.fitting_warnings = {
+            "invalid_sqrt": 0,        # "invalid value encountered in sqrt"
+            "covariance_estimation": 0, # "Covariance of the parameters could not be estimated"
+            "other_warnings": 0,        # Other warning types
+            "invalid_log": 0,          # "invalid value encountered in log"
+            "invalid_power": 0,        # "invalid value encountered in power"
+        }
+        
+        # Details for specific validation issues
+        self.validation_details = {}
     
     def add_success(self):
         """Record a completely successful API call cycle"""
@@ -245,6 +266,39 @@ class APICallStats:
                 self.error_types[error_type] += 1
             else:
                 self.error_types["other"] += 1
+    
+    def add_validation_issue(self, issue_type, details=None):
+        """
+        Record a validation issue
+        
+        Args:
+            issue_type: Type of validation issue (e.g., 'scalar_output', 'nan_values')
+            details: Optional details about the issue
+        """
+        if issue_type in self.validation_issues:
+            self.validation_issues[issue_type] += 1
+        else:
+            self.validation_issues["other_validation"] += 1
+        
+        # Store details if provided
+        if details:
+            if issue_type not in self.validation_details:
+                self.validation_details[issue_type] = []
+            self.validation_details[issue_type].append(details)
+    
+    def add_fitting_warning(self, warning_type, details=None):
+        """
+        Record a fitting warning
+        
+        Args:
+            warning_type: Type of fitting warning (e.g., 'invalid_sqrt', 'covariance_estimation')
+            details: Optional details about the warning
+        """
+        if warning_type in self.fitting_warnings:
+            self.fitting_warnings[warning_type] += 1
+        else:
+            logger.warning(f"Unknown fitting warning type: {warning_type}, adding it to tracking")
+            self.fitting_warnings[warning_type] += 1
     
     def _categorize_error(self, error):
         """Categorize an error based on its type and message"""
@@ -289,6 +343,14 @@ class APICallStats:
     def total_failures(self):
         """Get the total number of failures across all error types"""
         return sum(self.error_types.values())
+    
+    def total_validation_issues(self):
+        """Get the total number of validation issues"""
+        return sum(self.validation_issues.values())
+    
+    def total_fitting_warnings(self):
+        """Get the total number of fitting warnings"""
+        return sum(self.fitting_warnings.values())
     
     def get_stage_stats(self, stage):
         """Get statistics for a specific processing stage"""
@@ -344,8 +406,24 @@ class APICallStats:
                 for error_type, count in category_errors:
                     temp_result.append(f"    - {error_type.replace('_', ' ')}: {count}")
         if len(temp_result)==0:
-            result.append("No errors")
+            result.append("  No errors")
         else:
             result.extend(temp_result)
+            
+        # Add validation issue statistics
+        total_validation = self.total_validation_issues()
+        if total_validation > 0:
+            result.append("\nValidation issues:")
+            for issue_type, count in self.validation_issues.items():
+                if count > 0:
+                    result.append(f"  - {issue_type.replace('_', ' ')}: {count}")
+        
+        # Add fitting warning statistics
+        total_warnings = self.total_fitting_warnings()
+        if total_warnings > 0:
+            result.append("\nFitting warnings:")
+            for warning_type, count in self.fitting_warnings.items():
+                if count > 0:
+                    result.append(f"  - {warning_type.replace('_', ' ')}: {count}")
         
         return "\n".join(result)

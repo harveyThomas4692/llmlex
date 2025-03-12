@@ -135,11 +135,13 @@ def generate_base64_image_with_parents( x, y, parent_functions, fig = None, ax =
         x (list or numpy.ndarray): The x data for the plot.
         y (list or numpy.ndarray): The y data for the plot.
         parent_functions (list): List of functions that take x as input.
+        actually_plot (bool, optional): Whether to display the plot. Defaults to False.
+        title_override (str, optional): Custom title for the plot. Defaults to None.
+        fig (matplotlib.figure.Figure, optional): The matplotlib figure object. Defaults to None.
+        ax (matplotlib.axes.Axes, optional): The matplotlib axes object. Defaults to None.
     Returns:
         str: The base64 encoded string of the PNG image.
     """
-    x_min, x_max, y_min, y_max = min(x), max(x), min(y), max(y)
-
     logger.debug(f"Generating base64 image with {len(parent_functions)} parent functions")
     
     try:
@@ -150,9 +152,15 @@ def generate_base64_image_with_parents( x, y, parent_functions, fig = None, ax =
         
         if fig is None or ax is None:
             fig, ax = plt.subplots(figsize=(4, 3))
-            x_min, x_max, y_min, y_max = min(x), max(x), min(y), max(y)
+            x_min, x_max = min(x), max(x)
+            y_min, y_max = min(y), max(y)
             plt.xticks([x_min, x_max], ['%2.f' % x_min, '%2.f' % x_max])
             plt.yticks([y_min, y_max], ['%2.f' % y_min, '%2.f' % y_max])
+        else:
+            # Use the range from the main function
+            x_min, x_max = min(x), max(x)
+            y_min, y_max = min(y), max(y)
+            
         # Plot parent functions in faded colors
         colors = ['red', 'green', 'yellow', 'purple', 'orange', 'brown', 'pink', 'gray', 'cyan', 'magenta']
         for i, func in enumerate(parent_functions):

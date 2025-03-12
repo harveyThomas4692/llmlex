@@ -2,10 +2,11 @@ import unittest
 import logging
 import io
 import sys
+import asyncio
 import LLMSR
 import numpy as np
 import matplotlib.pyplot as plt
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 class TestLogging(unittest.TestCase):
     """Test suite for verifying proper logging functionality in LLMSR"""
@@ -100,7 +101,7 @@ class TestLogging(unittest.TestCase):
         
         # Now explicitly call fun_convert with the correct ansatz string
         test_ansatz = "params[0] * x**params[1] * np.exp(-params[2] * x)"
-        curve = LLMSR.response.fun_convert(test_ansatz)
+        curve, num_params, lambda_str = LLMSR.response.fun_convert(test_ansatz)
         
         # Verify logs
         log_content = self.log_capture.getvalue()
@@ -127,19 +128,33 @@ class TestLogging(unittest.TestCase):
             'function_list': None
         }
         
-        # Use patch context managers instead of direct module attribute modification
-        with patch('LLMSR.llmSR.single_call', return_value=mock_result), \
-             patch('LLMSR.llmSR.async_single_call', side_effect=lambda *args, **kwargs: mock_result), \
-             patch('LLMSR.llmSR.curve_fit', return_value=(np.array([1.0]), None)), \
-             patch('numpy.mean', return_value=10.0):  # Chi squared above exit condition
-            
-            # Run with synchronous mode to avoid coroutine warnings
-            result = LLMSR.run_genetic(
-                client, base64_image, x, y, 
-                population_size=1, num_of_generations=1,
-                temperature=1.0, exit_condition=0.0001,  # Very strict exit condition
-                use_async=False  # Use sync mode to avoid coroutine warnings
-            )
+        # Setup async mock function
+        async def mock_async_single_call(*args, **kwargs):
+            return mock_result
+        
+        # Setup async mock client
+        async_client = AsyncMock()
+        
+        # Create an event loop for async testing
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Use patch context managers
+            with patch('LLMSR.llmSR.async_single_call', side_effect=mock_async_single_call), \
+                 patch('LLMSR.llmSR.curve_fit', return_value=(np.array([1.0]), None)), \
+                 patch('numpy.mean', return_value=10.0):  # Chi squared above exit condition
+                
+                # Run with async mode (now the only supported mode)
+                result = LLMSR.run_genetic(
+                    async_client, base64_image, x, y, 
+                    population_size=1, num_of_generations=1,
+                    temperature=1.0, exit_condition=0.0001  # Very strict exit condition
+                )
+        finally:
+            # Clean up the event loop
+            loop.close()
+            asyncio.set_event_loop(None)
             
             # Verify logs
             log_content = self.log_capture.getvalue()

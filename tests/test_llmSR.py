@@ -5,6 +5,8 @@ import unittest
 import numpy as np
 import asyncio
 from unittest.mock import MagicMock, patch, AsyncMock
+import logging
+import pytest
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
@@ -16,6 +18,15 @@ import LLMSR.fit
 # Then import the functions we want to test
 from LLMSR.llmSR import single_call, run_genetic, async_single_call
 from tests.test_data.generate_test_data import generate_test_data
+
+# Optional imports for real API tests
+try:
+    import openai
+except ImportError:
+    pass  # Will be handled in the test_real_api_call
+
+# Suppress logging during tests
+logging.getLogger().setLevel(logging.CRITICAL)
 
 class TestLLMSR(unittest.TestCase):
     @classmethod
@@ -161,9 +172,9 @@ This function captures the exponential decay with oscillation pattern."""
         x = np.linspace(0.01, 1, 10)
         y = x**2
         base64_image = "fake_base64_string"
-        client = MagicMock()
+        client = AsyncMock()
         
-        # Create a mock result that will be returned by single_call
+        # Create a mock result for the async_single_call function
         mock_result = {
             'params': np.array([0.1, 2.0, 3.0]),
             'score': -0.001,
@@ -174,16 +185,22 @@ This function captures the exponential decay with oscillation pattern."""
             'function_list': None
         }
         
-        # Replace single_call with a function that returns our mock result
-        with patch('LLMSR.llmSR.single_call', return_value=mock_result):
-            # Patch curve_fit to return deterministic values
-            with patch('LLMSR.llmSR.curve_fit', return_value=(np.array([1.0]), None)):
+        # Mock the async_single_call function to return our result
+        async def mock_async_single_call(*args, **kwargs):
+            return mock_result
+            
+        # Setup event loop for testing async code
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Patch the async_single_call function
+            with patch('LLMSR.llmSR.async_single_call', side_effect=mock_async_single_call):
                 # Run the genetic algorithm with minimal population/generations
                 result = run_genetic(
                     client, base64_image, x, y, 
                     population_size=2, num_of_generations=2,
-                    temperature=1.0, exit_condition=1e-7,
-                    use_async=False
+                    temperature=1.0, exit_condition=1e-7
                 )
                 
                 # Verify the result structure
@@ -193,6 +210,10 @@ This function captures the exponential decay with oscillation pattern."""
                 # Each generation should have a population
                 self.assertGreater(len(result[0]), 0)
                 self.assertGreater(len(result[1]), 0)
+        finally:
+            # Clean up the event loop
+            loop.close()
+            asyncio.set_event_loop(None)
         
     def test_run_genetic_async(self):
         """Test the run_genetic function with async mode enabled and proper mocking"""
@@ -245,12 +266,9 @@ This function captures the exponential decay with oscillation pattern."""
             loop.close()
             asyncio.set_event_loop(None)
     
+    @pytest.mark.api
     def test_real_api_call(self):
-        """Test with a real API call - skipped by default but can be enabled by setting LLMSR_TEST_REAL_API=1"""
-        # Check if we should run with real API
-        if not os.environ.get('LLMSR_TEST_REAL_API'):
-            self.skipTest("Set LLMSR_TEST_REAL_API=1 to run tests with real API calls")
-        
+        """Test with a real API call - runs by default unless disabled with --no-api flag"""
         # Import necessary modules for this test
         try:
             import openai
@@ -259,14 +277,7 @@ This function captures the exponential decay with oscillation pattern."""
             
         # Skip if no API key is set
         if not os.environ.get('OPENROUTER_API_KEY'):
-            # Try to load from .env file
-            if os.path.exists('.env'):
-                from dotenv import load_dotenv
-                load_dotenv()
-                
-            # Check again after loading .env
-            if not os.environ.get('OPENROUTER_API_KEY'):
-                self.skipTest("No OPENROUTER_API_KEY found - set this environment variable to run real API tests")
+            self.skipTest("No OPENROUTER_API_KEY found - set this environment variable to run real API tests")
         
         # Setup client with API key
         client = openai.OpenAI(

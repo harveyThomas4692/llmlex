@@ -1,19 +1,20 @@
-import unittest
+#!/usr/bin/env python
+"""
+Run tests for the LLMSR package.
+
+This script provides a convenient way to run the test suite with command line arguments
+to control which tests are run, including API tests and archived tests.
+"""
+
 import os
 import sys
 import logging
+import warnings
+import subprocess
+import shlex
 
-# Add parent directory to path
+# Add parent directory to path so that 'tests' can be found
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
-
-# Import the test modules
-from tests.test_images import TestImages
-from tests.test_response import TestResponse
-from tests.test_fit import TestFit
-from tests.test_llm import TestLLM
-from tests.test_llmSR import TestLLMSR
-from tests.test_logging import TestLogging
-from tests.test_kan import TestKANFunctionality, TestKanSrFunctions
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -38,88 +39,68 @@ def check_api_key_available():
         logger.info("No API key found, real API tests will be skipped")
         return False
 
-def run_tests(include_real_api_tests=None):
+def run_tests(no_api=False, run_archived=False):
     """
-    Run all tests, optionally including real API tests
+    Run all tests using pytest.
     
     Args:
-        include_real_api_tests: If True, always run real API tests.
-                               If False, never run real API tests.
-                               If None (default), run if API key is available.
+        no_api: If True, skip API tests.
+        run_archived: If True, run archived tests.
+    
+    Returns:
+        Exit code from pytest
     """
-    # Create a test suite
-    test_suite = unittest.TestSuite()
-    
-    # Add test cases to the suite
-    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestImages))
-    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestResponse))
-    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestFit))
-    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestLLM))
-    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestLLMSR))
-    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestLogging))
-    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestKANFunctionality))
-    test_suite.addTest(unittest.defaultTestLoader.loadTestsFromTestCase(TestKanSrFunctions))
-    
-    # Check if we should run real API tests
-    should_run_api_tests = include_real_api_tests
-    if should_run_api_tests is None:
-        should_run_api_tests = check_api_key_available()
-    
-    # Add real API tests if requested and API key is available
-    if should_run_api_tests:
-        # Set environment flag to enable real API tests
-        os.environ['LLMSR_TEST_REAL_API'] = '1'
-        print("Instructed to run real API tests")
-        
-        # Create a separate test suite just for API tests
-        api_test_suite = unittest.TestSuite()
-        api_test_suite.addTest(TestLLMSR('test_real_api_call'))
-        
-        # Add to main test suite
-        test_suite.addTest(api_test_suite)
-        logger.info("Including real API tests in test suite")
-    else:
-        # Make sure the flag is not set
-        if 'LLMSR_TEST_REAL_API' in os.environ:
-            del os.environ['LLMSR_TEST_REAL_API']
-        logger.info("Skipping real API tests")
-    
-    # Run the tests
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(test_suite)
-    
-    # Return the result
-    return result
-
-if __name__ == "__main__":
-    # Parse any command line arguments
-    import argparse
-    parser = argparse.ArgumentParser(description="Run LLMSR tests")
-    parser.add_argument('--api-tests', action='store_true', help="Force run real API tests (requires API key)")
-    parser.add_argument('--no-api-tests', action='store_true', help="Skip real API tests even if key is available")
-    args = parser.parse_args()
-    
-    # Determine whether to run API tests
-    include_api_tests = None
-    if args.api_tests:
-        include_api_tests = True
-        print("Instructed to run real API tests")
-        if not check_api_key_available():
-            print("Warning: API key not found but API tests requested. Tests may fail.")
-            logger.warning("API key not found but API tests requested. Tests may fail.")
-            raise ValueError("API key not found but API tests requested. Tests may fail.")
-    elif args.no_api_tests:
-        include_api_tests = False
-        print("Instructed to skip real API tests")
-    
     # First generate test data
     from tests.test_data.generate_test_data import generate_test_data
     print("Generating test data...")
     generate_test_data()
     
-    # Run tests
+    # Build the pytest command
+    pytest_cmd = ["python", "-m", "pytest", "tests/"]
+    
+    # Add arguments
+    if no_api:
+        pytest_cmd.append("--no-api")
+    
+    if run_archived:
+        # When run_archived is True, we want to run all tests including the archive directory
+        # Since we're using pytest_ignore_collect to ignore archived tests by default, we need to
+        # modify the command to explicitly include the archive directory
+        pytest_cmd = ["python", "-m", "pytest", "tests/", "tests/archive/"]
+    
+    # Add verbosity
+    pytest_cmd.append("-v")
+    
+    # Run pytest
+    print(f"\nRunning command: {' '.join(pytest_cmd)}\n")
+    return subprocess.call(pytest_cmd)
+
+if __name__ == "__main__":
+    # Parse any command line arguments
+    import argparse
+    parser = argparse.ArgumentParser(description="Run LLMSR tests using pytest")
+    parser.add_argument('--no-api', action='store_true', help="Skip API tests")
+    parser.add_argument('--run-archived', action='store_true', help="Run archived tests")
+    parser.add_argument('--pytest-args', type=str, help="Additional arguments to pass to pytest")
+    args = parser.parse_args()
+    
+    # Check for API key if needed
+    if not args.no_api and not check_api_key_available():
+        print("Warning: API key not found, API tests will be skipped or may fail.")
+        logger.warning("API key not found, API tests will be skipped or may fail.")
+    
+    # Run the tests
     print("\nRunning tests...\n")
-    result = run_tests(include_real_api_tests=include_api_tests)
+    exit_code = run_tests(
+        no_api=args.no_api,
+        run_archived=args.run_archived
+    )
+    
+    # If additional pytest args were provided, run again with those
+    if args.pytest_args:
+        additional_cmd = ["python", "-m", "pytest"] + shlex.split(args.pytest_args)
+        print(f"\nRunning additional pytest command: {' '.join(additional_cmd)}\n")
+        exit_code = subprocess.call(additional_cmd)
     
     # Exit with appropriate status code
-    sys.exit(not result.wasSuccessful())
+    sys.exit(exit_code)

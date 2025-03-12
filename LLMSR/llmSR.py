@@ -13,7 +13,7 @@ import importlib.util
 import time
 import re
 from LLMSR.response import APICallStats
-from LLMSR.fit import get_chi_squared
+from LLMSR.fit import get_n_chi_squared
 
 # Check if nest_asyncio is available
 try:
@@ -165,7 +165,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
             except Exception as e:
                 stats.stage_failure("ansatz_extraction", e)
                 last_error = e
-                logger.warning(f"Ansatz extraction failed: {e}")
+                logger.debug(f"Ansatz extraction failed: {e}")
                 # For these errors, we might want to try a new API call
                 response = None
                 continue
@@ -173,12 +173,12 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
             # Convert ansatz to function
             try:
                 logger.debug("Converting ansatz to function")
-                curve, num_params = fun_convert(ansatz)
+                curve, num_params, lambda_str = fun_convert(ansatz)
                 stats.stage_success("function_conversion")
             except Exception as e:
                 stats.stage_failure("function_conversion", e)
                 last_error = e
-                logger.warning(f"Function conversion failed: {e}")
+                logger.debug(f"Function conversion failed: {e}")
                 # For these errors, we might want to try a new API call
                 response = None
                 continue
@@ -186,13 +186,13 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
             # Fit curve to data
             try:
                 logger.debug("Fitting curve to data")
-                params, score = fit.fit_curve(x, y, curve, num_params, allow_using_jax=True)
+                params, score = fit.fit_curve(x, y, curve, num_params, allow_using_jax=True, curve_str=lambda_str, stats=stats)
                 logger.info(f"Fit result: score={-score}, params={params}")
                 stats.stage_success("curve_fitting")
             except Exception as e:
                 stats.stage_failure("curve_fitting", e)
                 last_error = e
-                logger.warning(f"Curve fitting failed: {e}")
+                logger.debug(f"Curve fitting in single_call failed: {e}")
                 # For these errors, we might want to try a new API call
                 response = None
                 continue
@@ -435,7 +435,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
                 
                 # Try to convert to a function
                 try:
-                    f, num_params = fun_convert(ansatz)
+                    f, num_params, lambda_str = fun_convert(ansatz)
                     stats.stage_success("function_conversion")
                 except Exception as e:
                     stats.stage_failure("function_conversion", e)
@@ -445,16 +445,16 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
                 
                 # Try to fit the curve
                 try:
-                    params, chi2 = fit.fit_curve(x, y, f, num_params, allow_using_jax=True)
+                    params, chi2 = fit.fit_curve(x, y, f, num_params, allow_using_jax=True, curve_str=lambda_str, stats=stats)
                     if chi2 == float('inf'):
                         logger.debug(f"Curve fitting failed: chi2 is infinite {ansatz} {num_params} {f}")# already logged elsewhere
-                        stats.stage_failure("curve_fitting", e)
+                        stats.stage_failure("curve_fitting", RuntimeError("chi2 is infinite"))
                         continue
                     stats.stage_success("curve_fitting")
                 except Exception as e:
                     stats.stage_failure("curve_fitting", e)
                     last_error = e
-                    logger.warning(f"Curve fitting failed: {e}")
+                    logger.warning(f"Curve fitting in async_single_call failed: {e}")
                     continue
 
                 # Validate the function output
@@ -513,7 +513,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
 
 def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                 temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5, system_prompt=None, 
-                elite=False, for_kan=False, use_async=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False):
+                elite=False, for_kan=False, use_async=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings = False):
     """
         Run a genetic algorithm to fit a model to the given data.
         Parameters:
@@ -553,16 +553,16 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     logger.debug("Checking constant function as baseline")
     curve = lambda x, *params: params[0] * np.ones(len(x))
     params, _ = curve_fit(curve, x, y, p0=[1])
-    chi_squared = get_chi_squared(x, y, curve, params)
+    n_chi_squared = get_n_chi_squared(x, y, curve, params)
 
-    if chi_squared <= exit_condition:
-        logger.info(f"Constant function meets exit condition and is a good fit - returning early. Score: {chi_squared}, constant: {params}")
+    if n_chi_squared <= exit_condition:
+        logger.info(f"Constant function meets exit condition and is a good fit - returning early. Score: {-n_chi_squared}, constant: {params}")
         # Since we're returning early, there are no API calls to report
         logger.info(f"\nNo API calls were made (using constant function).")
         
         populations.append([{
             "params": params,
-            "score": -chi_squared,
+            "score": -n_chi_squared,
             "ansatz": "params[0]" if for_kan else "params[0]",
             "Num_params": 0,
             "response": None,
@@ -571,81 +571,57 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         }])
         return populations
         
-    logger.info(f"Constant function is not a good fit: Score: {chi_squared}, for constant: {params}")
+    logger.info(f"Constant function is not a good fit: Score: {-n_chi_squared}, for constant: {params}")
 
     
-    if use_async:
-        logger.info("Generating initial population asynchronously")
-        
-        async def generate_population():
-            tasks = []
-            semaphore = asyncio.Semaphore(10)  # Limit concurrent requests to 10
-            
-            async def create_individual():
-                nonlocal api_stats
-                async with semaphore:
-                    max_attempts = 5
-                    for attempt in range(max_attempts):
-                        try:
-                            # Calculate exponential backoff delay
-                            backoff_time = 0.1 * (2 ** attempt)  # 0.5s, 1s, 2s, 4s, 8s
-                            
-                            logger.debug(f"Async: Generating individual, attempt {attempt+1}/{max_attempts}")
-                            result = await async_single_call(
-                                client, base64_image, x, y, model=model, system_prompt=system_prompt,
-                                stats=api_stats
-                            )
-                            if result is not None:
-                                # Stats already updated in async_single_call
-                                return result
-                            
-                            # No specific error, but call failed - don't add failure here as it's already recorded in async_single_call
-                            logger.warning(f"Async: Failed attempt {attempt+1}/{max_attempts}, waiting {backoff_time}s before retry")
-                            await asyncio.sleep(backoff_time)
-                        except Exception as e:
-                            api_stats.stage_failure("api_call", e)
-                            logger.error(f"Async: Error in attempt {attempt+1}/{max_attempts}: {e}")
-                            logger.warning(f"Async: Waiting {backoff_time}s before retry")
-                            await asyncio.sleep(backoff_time)
-                    
-                    logger.error("Async: Failed to generate individual after 5 attempts with exponential backoff")
-                    return None
-            for i in range(population_size):
-                tasks.append(create_individual())
-            
-            # Wait for all tasks to complete
-            results = await asyncio.gather(*tasks)
-            return [r for r in results if r is not None]
-        
-        # Use our helper function to safely execute the async code in any context
-        population = execute_async_in_loop(generate_population())
-            
-        logger.info(f"Generated {len(population)} individuals asynchronously")
+    # Always use async mode
+    use_async = True
+    logger.info(f"Generating initial population asynchronously")
     
-    else:
-        logger.info("Generating initial population synchronously")
-        # Original synchronous implementation
-        for i in tqdm(range(population_size)):
-            good = False
-            attempts = 0
-            while not good and attempts < 5:  # Limit retries
-                attempts += 1
-                logger.debug(f"Generating individual {i+1}/{population_size}, attempt {attempts}")
-                try:
-                    result = single_call(client, base64_image, x, y, model=model, system_prompt=system_prompt, stats=api_stats)
-                    if result is not None:
-                        population.append(result)
-                        good = True
-                        # Stats already updated in single_call
-                    else:
-                        # Stats already recorded in single_call
-                        logger.warning(f"Failed to generate individual {i+1}, attempt {attempts}")
-                except Exception as e:
-                    api_stats.stage_failure("api_call", e)
-                    logger.warning(f"Failed to generate individual {i+1}, attempt {attempts}: {e}")
-                    
-            if not good:
-                logger.error(f"Failed to generate individual {i+1} after {attempts} attempts")
+    async def generate_population():
+        tasks = []
+        semaphore = asyncio.Semaphore(10)  # Limit concurrent requests to 10
+        
+        async def create_individual():
+            nonlocal api_stats
+            async with semaphore:
+                max_attempts = 5
+                for attempt in range(max_attempts):
+                    try:
+                        # Calculate exponential backoff delay
+                        backoff_time = 0.1 * (2 ** attempt)  # 0.5s, 1s, 2s, 4s, 8s
+                        
+                        logger.debug(f"Async: Generating individual, attempt {attempt+1}/{max_attempts}")
+                        result = await async_single_call(
+                            client, base64_image, x, y, model=model, system_prompt=system_prompt,
+                            stats=api_stats
+                        )
+                        if result is not None:
+                            # Stats already updated in async_single_call
+                            return result
+                        
+                        # No specific error, but call failed - don't add failure here as it's already recorded in async_single_call
+                        logger.warning(f"Async: Failed attempt {attempt+1}/{max_attempts}, waiting {backoff_time}s before retry")
+                        await asyncio.sleep(backoff_time)
+                    except Exception as e:
+                        api_stats.stage_failure("api_call", e)
+                        logger.error(f"Async: Error in attempt {attempt+1}/{max_attempts}: {e}")
+                        logger.warning(f"Async: Waiting {backoff_time}s before retry")
+                        await asyncio.sleep(backoff_time)
+                
+                logger.error("Async: Failed to generate individual after 5 attempts with exponential backoff")
+                return None
+        for i in range(population_size):
+            tasks.append(create_individual())
+        
+        # Wait for all tasks to complete
+        results = await asyncio.gather(*tasks)
+        return [r for r in results if r is not None]
+    
+    # Use our helper function to safely execute the async code in any context
+    population = execute_async_in_loop(generate_population())
+        
+    logger.info(f"Generated {len(population)} individuals")
 
     # Check if we have a valid population
     if not population:
@@ -654,10 +630,10 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         
         # If constant_on_failure is True, return the constant function
         if constant_on_failure:
-            logger.info(f"Returning constant function as fallback (constant_on_failure=True). Score: {chi_squared}, constant: {params}")
+            logger.info(f"Returning constant function as fallback (constant_on_failure=True). Score: {-n_chi_squared}, constant: {params}")
             populations.append([{
                 "params": params,
-                "score": -chi_squared,
+                "score": -n_chi_squared,
                 "ansatz": "params[0]" if for_kan else "params[0]",
                 "Num_params": 0,
                 "response": None,
@@ -669,18 +645,21 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         raise RuntimeError(error_msg)
     
     # Handle NaN and infinite scores
-    for p in population:
-        if not np.isfinite(p['score']):
-            # Find the minimum finite score to use as reference
-            finite_scores = [ind['score'] for ind in population if np.isfinite(ind['score'])]
-            if finite_scores:
-                min_score = min(finite_scores)
-                penalty = 1e2  # Smaller penalty to stay closer to original implementation
-                bad_score = min_score - penalty
-            else:
-                bad_score = -1e8  # Fallback to original value if no finite scores
-                
-            logger.warning(f"Found non-finite score {p['score']}, setting to {bad_score}")
+    # Count non-finite scores
+    non_finite_scores = [p for p in population if not np.isfinite(p['score'])]
+    if non_finite_scores:
+        # Find the minimum finite score to use as reference
+        finite_scores = [ind['score'] for ind in population if np.isfinite(ind['score'])]
+        if finite_scores:
+            min_score = min(finite_scores)
+            bad_score = min_score - 1e2  # Fixed penalty
+        else:
+            bad_score = -1e8  # Fallback if no finite scores
+            
+        logger.info(f"Found {len(non_finite_scores)} non-finite scores, setting all to {bad_score}. Example ansatz: {non_finite_scores[0]['ansatz']}")
+        
+        # Set all non-finite scores to the same bad_score
+        for p in non_finite_scores:
             p['score'] = bad_score
             
     population.sort(key=lambda x: x['score'])
@@ -690,6 +669,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     
     if best_pop['score'] > -exit_condition:
         logger.info("Exit condition met after initial population")
+        print(f"\n{api_stats}")
         return populations
 
     if plot_parents and demonstrate_parent_plotting:
@@ -812,10 +792,10 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
             
             # If constant_on_failure is True, return the constant function
             if constant_on_failure:
-                logger.info(f"Returning constant function as fallback (constant_on_failure=True). Score: {chi_squared}, constant: {params}")
+                logger.info(f"Returning constant function as fallback (constant_on_failure=True). Score: {n_chi_squared}, constant: {params}")
                 populations.append([{
                     "params": params,
-                    "score": -chi_squared,
+                    "score": -n_chi_squared,
                     "ansatz": "params[0]" if for_kan else "params[0]",
                     "Num_params": 0,
                     "response": None,
@@ -831,20 +811,27 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         if best_pop['score'] > -exit_condition:
             logger.info(f"Exit condition met after generation {generation+1}: {best_pop['score']}>{-exit_condition}")
             
-            # Print API call statistics
+            # Print API call and validation statistics
             print(f"\n{api_stats}")
+            
+            # Print validation issue summary if any issues detected
+            if api_stats.total_validation_issues() > 0:
+                logger.info(f"Validation issues detected during genetic algorithm run")
             
             return populations
     
     logger.info(f"Genetic algorithm completed after {num_of_generations} generations")
     
-    # Print API call statistics
+    # Print comprehensive statistics
     print(f"\n{api_stats}")
-
+    
+    # Print validation issue summary if any issues detected
+    if api_stats.total_validation_issues() > 0:
+        logger.info(f"Validation issues detected during genetic algorithm run")
     
     return populations
 
-def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False):
+def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings = False):
     """
     Converts a given kan model symbolic representations using llmsr.
     Parameters:
@@ -857,6 +844,11 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
         exit_condition (float, optional): The exit condition for the genetic algorithm. Default is 1e-3.
         verbose (int, optional): Verbosity level for logging. Default is 0.
         use_async (bool, optional): Whether to use asynchronous processing for population generation. Default is True.
+        plot_fit (bool, optional): Whether to plot the fit of the symbolic functions. Default is True.
+        plot_parents (bool, optional): Whether to plot the parents of the symbolic functions. Default is False.
+        demonstrate_parent_plotting (bool, optional): Whether to demonstrate the parent plotting. Default is False.
+        constant_on_failure (bool, optional): Whether to return the constant function if the genetic algorithm fails. Default is False.
+        disable_parse_warnings (bool, optional): Whether to disable parse warnings. Default is False.
     Returns:
         - res_fcts (dict): A dictionary mapping layer, input, and output indices to their corresponding symbolic functions.
     """
@@ -884,6 +876,13 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
     symbolic_connections = 0
     zero_connections = 0
     processed_connections = 0
+    
+    # Track fitting warning statistics across all connections
+    total_fitting_warnings = {
+        "invalid_sqrt": 0,
+        "covariance_estimation": 0,
+        "other_warnings": 0
+    }
     
     logger.info("Processing KAN model connections")
     for l in range(len(model.width_in) - 1):
@@ -948,22 +947,34 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                             temperature=temperature, model=gpt_model, 
                             system_prompt=None, elite=False, 
                             exit_condition=exit_condition, for_kan=True,
-                            use_async=use_async, plot_parents=plot_parents,demonstrate_parent_plotting=demonstrate_parent_plotting, constant_on_failure=constant_on_failure
+                            use_async=use_async, plot_parents=plot_parents,demonstrate_parent_plotting=demonstrate_parent_plotting, constant_on_failure=constant_on_failure, disable_parse_warnings=disable_parse_warnings
                         )
                         res_fcts[(l,i,j)] = res
                         logger.info(f"Successfully found expression for connection ({l},{i},{j})")
+                        
+                        # Track fitting warnings from this run
+                        if res is not None and len(res) > 0 and len(res[-1]) > 0:
+                            # Find the last population stats if available
+                            for pop in reversed(res):
+                                for individual in pop:
+                                    if individual.get('stats') and hasattr(individual['stats'], 'fitting_warnings'):
+                                        for warning_type, count in individual['stats'].fitting_warnings.items():
+                                            if count > 0:
+                                                total_fitting_warnings[warning_type] += count
+                                        break
+                                break
                         
                         # Plot the fitted function on top of the original data
                         if res is not None and len(res) > 0 and len(res[-1]) > 0:
                             # Find the highest scoring element across all generations
                             highest_score_element = max((item for sublist in res for item in sublist), key=lambda item: item['score'])
-                            print(f"Approximation for ({l},{i},{j}): {highest_score_element['ansatz'].strip()}, with parameters {np.round(highest_score_element['params'], 3)}")
+                            print(f"Approximation for ({l},{i},{j}): {highest_score_element['ansatz'].strip()}, with score {highest_score_element['score']} and parameters {np.round(highest_score_element['params'], 3)}")
                             
                             # Use the highest scoring individual for plotting
                             if plot_fit:
                                 try:
                                     # Convert the ansatz to a function
-                                    curve, _ = fun_convert(highest_score_element['ansatz'])
+                                    curve, _,_ = fun_convert(highest_score_element['ansatz'])
                                     # Generate y values using the fitted function
                                     fitted_y = curve(x, *highest_score_element['params'])
                                     # Check if fitted_y is a scalar or has different shape than x
@@ -1002,6 +1013,14 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
     # Log summary
     logger.info(f"KAN conversion complete: {total_connections} total connections")
     logger.info(f"Connection breakdown: {symbolic_connections} symbolic, {zero_connections} zero, {processed_connections} processed")
+    
+    # Log fitting warning summary if any warnings were detected
+    if sum(total_fitting_warnings.values()) > 0:
+        logger.info("Fitting warnings encountered during processing:")
+        for warning_type, count in total_fitting_warnings.items():
+            if count > 0:
+                logger.info(f"  - {warning_type.replace('_', ' ')}: {count}")
+                
     end_usage = check_key_usage(client)
     logger.info(f"API key usage whilst this was running: ${end_usage - start_usage:.2f}")
     
@@ -1119,19 +1138,40 @@ def validate_function_output(x, f, params, stats):
     """
     # Test with a small sample of the actual data
     test_x = x[:min(57, len(x))]
-    test_y = f(test_x, *params)
+    try:
+        test_y = f(test_x, *params)
+        
+        # Check if output shape matches input
+        if test_y.shape != test_x.shape:
+            logger.warning(f"Function output shape {test_y.shape} doesn't match input shape {test_x.shape}")
+            # Try to reshape or broadcast if possible
+            if np.isscalar(test_y) or len(test_y) == 1:
+                # Handle scalar output by broadcasting
+                logger.debug("Attempting to broadcast scalar output to match input shape")
+                test_y = np.full_like(test_x, test_y)
+                if hasattr(stats, 'add_validation_issue'):
+                    stats.add_validation_issue('scalar_output')
+            elif len(test_y) != len(test_x):
+                if hasattr(stats, 'add_validation_issue'):
+                    stats.add_validation_issue('shape_mismatch')
+                raise ValueError(f"Function returns {len(test_y)} values for {len(test_x)} inputs")
+        
+        # Additional check for NaN or inf values
+        if np.any(np.isnan(test_y)):
+            logger.debug("Function returns NaN values")
+            if hasattr(stats, 'add_validation_issue'):
+                stats.add_validation_issue('nan_values')
+        
+        if np.any(np.isinf(test_y)):
+            logger.debug("Function returns inf values")
+            if hasattr(stats, 'add_validation_issue'):
+                stats.add_validation_issue('inf_values')
     
-    # Check if output shape matches input
-    if test_y.shape != test_x.shape:
-        logger.warning(f"Function output shape {test_y.shape} doesn't match input shape {test_x.shape}")
-        # Try to reshape or broadcast if possible
-        if np.isscalar(test_y) or len(test_y) == 1:
-            # Handle scalar output by broadcasting
-            logger.debug("Attempting to broadcast scalar output to match input shape")
-            test_y = np.full_like(test_x, test_y)
-        elif len(test_y) != len(test_x):
-            raise ValueError(f"Function returns {len(test_y)} values for {len(test_x)} inputs")
-    
-    # Additional check for NaN or inf values
-    if np.any(np.isnan(test_y)) or np.any(np.isinf(test_y)):
-        logger.warning("Function returns NaN or inf values")
+    except Exception as e:
+        # Track other kinds of function evaluation errors
+        logger.warning(f"Error evaluating function: {e}")
+        if hasattr(stats, 'add_validation_issue'):
+            stats.add_validation_issue('evaluation_error', str(e))
+        raise
+
+    return 

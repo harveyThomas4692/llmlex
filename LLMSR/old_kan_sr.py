@@ -22,7 +22,7 @@ import sympy as sp
 import LLMSR.llmSR as llmSR
 from sympy import sin, cos, exp, log, sqrt, sinh, cosh, tanh
 from sympy.printing.numpy import NumPyPrinter
-from LLMSR.fit import get_chi_squared, fit_curve_with_guess, fit_curve_with_guess_jax
+from LLMSR.fit import get_n_chi_squared, fit_curve_with_guess, fit_curve_with_guess_jax
 import stopit
 
 
@@ -513,10 +513,10 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
     
     for i, expr in enumerate(full_expressions):
         final_KAN_expressions = []
-        chi_squared_KAN_finals = []
+        n_chi_squared_KAN_finals = []
         final_LLM_expressions = []
-        chi_squared_LLM_finals = []
-        best_chi_squared = float('inf')
+        n_chi_squared_LLM_finals = []
+        best_n_chi_squared = float('inf')
         best_expression = None
         best_expression_index = None
         best_fit_type = None  # Track the type of the best fit
@@ -538,18 +538,18 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
                 print(f"Original function 'f' not defined; skipping plotting actual function {e}")
             ax.plot(xs, [f_fitted(x) for x in xs], label="KANSR (raw)")
             ax.legend()
-        # Calculate chi-squared for the raw expression
+        # Calculate n_chi-squared for the raw expression
         try:
-            raw_chi_squared = get_chi_squared(x_data, y_data, f_fitted, [])
-            print(f"Raw expression chi-squared: {raw_chi_squared:.4e}")
+            raw_n_chi_squared = get_n_chi_squared(x_data, y_data, f_fitted, [])
+            print(f"Raw expression n_chi-squared: {raw_n_chi_squared:.4e}")
             # Initialize best values with the raw expression
-            best_chi_squared = raw_chi_squared
+            best_n_chi_squared = raw_n_chi_squared
             best_expression = expr
             best_expression_index = i
             best_fit_type = "raw"  # Initial best fit is the raw expression
         except Exception as e:
-            print(f"Error calculating raw chi-squared: {e}")
-            best_chi_squared = float('inf')
+            print(f"Error calculating raw n_chi-squared: {e}")
+            best_n_chi_squared = float('inf')
             best_expression = None
             best_expression_index = None
             best_fit_type = None
@@ -567,28 +567,36 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
         curve_np = eval(curve_ansatz_np, {"np": np})
         try:
             try:
-                params_opt, chi_squared = fit_curve_with_guess_jax(x_data, y_data,
-                                                    curve_np, params_initial, try_all_methods=True, log_everything=True, then_do_reg_fitting=True, numpy_curve_str=curve_ansatz_np)
+                params_opt, n_chi_squared = fit_curve_with_guess_jax(x_data, y_data,
+                                                    curve_np, params_initial, 
+                                                    log_everything=False, 
+                                                    log_methods=True,
+                                                    then_do_reg_fitting=True, 
+                                                    numpy_curve_str=curve_ansatz_np)
             except RuntimeError as e:
                 #print(f"Refitting failed: {e}. Trying with random initial parameters...")
                 # Generate random initial parameters within a reasonable range
                 random_params = np.random.uniform(-1.0, 1.0, len(params_initial))
-                params_opt, chi_squared = fit_curve_with_guess_jax(x_data, y_data,
-                                                    curve_np, random_params, try_all_methods=True, log_everything=True, then_do_reg_fitting=True, numpy_curve_str=curve_ansatz_np)
-            print(f"Refitting: {curve_ansatz_str_np} - so after simplification and refitting gave a chi^2 of {chi_squared:.4e}")
+                params_opt, n_chi_squared = fit_curve_with_guess_jax(x_data, y_data,
+                                                    curve_np, random_params, 
+                                                    log_everything=False, 
+                                                    log_methods=True,
+                                                    then_do_reg_fitting=True, 
+                                                    numpy_curve_str=curve_ansatz_np)
+            print(f"Refitting: {curve_ansatz_str_np} - so after simplification and refitting gave a chi^2 of {n_chi_squared:.4e}")
             #simplified_expressions.append(expr)
-            #chi_squared_simplified.append(chi_squared)
+            #n_chi_squared_simplified.append(n_chi_squared)
             
-            # Track best chi-squared
-            if chi_squared < best_chi_squared:
-                best_chi_squared = chi_squared
+            # Track best n_chi-squared
+            if n_chi_squared < best_n_chi_squared:
+                best_n_chi_squared = n_chi_squared
                 best_expression = simplify_expression(subst_params(curve_ansatz_str_np, params_opt), Ninputs, timeout = timeout_simplify*3) 
                 best_expression_index = i
                 best_fit_type = "KANsimplified"  # Best fit is from KAN simplification
         except RuntimeError as e:
             params_opt = params_initial
-            chi_squared = get_chi_squared(x_data, y_data, curve_np, params_opt)
-            print(f"All fits failed, proceeding with unoptimized parameters {e}, chi-squared with unoptimized parameters: {chi_squared:.4e}")
+            n_chi_squared = get_n_chi_squared(x_data, y_data, curve_np, params_opt)
+            print(f"All fits failed, proceeding with unoptimized parameters {e}, n_chi-squared with unoptimized parameters: {n_chi_squared:.4e}")
         # Prune and simplify the refitted model.
         if prune_small_terms:
             prune_amount = 1e-6 if prune_small_terms==True else prune_amount
@@ -598,7 +606,7 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
         expr_sp = simplify_expression(subst_params(curve_ansatz_str_np, params_opt), Ninputs)
         print("KAN expression (final):\n", expr_sp)
         final_KAN_expressions.append(expr_sp)
-        chi_squared_KAN_finals.append(chi_squared)
+        n_chi_squared_KAN_finals.append(n_chi_squared)
     
         # Plot comparison.
         if plot_all:
@@ -610,7 +618,7 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
             num_attempts = 3
             # Try up to 3 times to get a successful LLM simplification
             best_llm_expr = None
-            best_llm_chi_squared = float('inf')
+            best_llm_n_chi_squared = float('inf')
             
             for attempt_num in range(num_attempts):  # Maximum of 3 attempts
                 try:
@@ -627,19 +635,27 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
                             curve_np = eval(curve_ansatz_np, {"np": np})
                             
                             try:
-                                params_opt, chi_squared = fit_curve_with_guess_jax(x_data, y_data,
-                                                                curve_np, params_initial, try_all_methods=True, log_everything=True, then_do_reg_fitting=True, numpy_curve_str=curve_ansatz_np)
+                                params_opt, n_chi_squared = fit_curve_with_guess_jax(x_data, y_data,
+                                                                curve_np, params_initial, 
+                                                                log_everything=False, 
+                                                                log_methods=True,
+                                                                then_do_reg_fitting=True, 
+                                                                numpy_curve_str=curve_ansatz_np)
                             except RuntimeError as e:
                                 print(f"Refitting failed: {e}. Trying with random initial parameters...")
                                 # Generate random initial parameters within a reasonable range
                                 random_params = np.random.uniform(-1.0, 1.0, len(params_initial))
-                                params_opt, chi_squared = fit_curve_with_guess_jax(x_data, y_data,
-                                                                curve_np, random_params, try_all_methods=True, log_everything=True, then_do_reg_fitting=True, numpy_curve_str=curve_ansatz_np)
+                                params_opt, n_chi_squared = fit_curve_with_guess_jax(x_data, y_data,
+                                                                curve_np, random_params, 
+                                                                log_everything=False, 
+                                                                log_methods=True,
+                                                                then_do_reg_fitting=True, 
+                                                                numpy_curve_str=curve_ansatz_np)
                             
-                            print(f"LLM improvement #{sub_attempt} gave a chi^2 of {chi_squared:.4e}")
+                            print(f"LLM improvement #{sub_attempt} gave a chi^2 of {n_chi_squared:.4e}")
                             
-                            if chi_squared < best_llm_chi_squared:
-                                best_llm_chi_squared = chi_squared
+                            if n_chi_squared < best_llm_n_chi_squared:
+                                best_llm_n_chi_squared = n_chi_squared
                                 if prune_small_terms:
                                     prune_amount = 1e-6 if prune_small_terms==True else prune_amount
                                     print(f"Pruning small terms, smaller than {prune_amount}")
@@ -664,11 +680,11 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
             # If we found a valid LLM expression
             if best_llm_expr is not None:
                 final_LLM_expressions.append(best_llm_expr)
-                chi_squared_LLM_finals.append(best_llm_chi_squared)
+                n_chi_squared_LLM_finals.append(best_llm_n_chi_squared)
                 
                 # Check if this is the best overall expression
-                if best_llm_chi_squared < best_chi_squared:
-                    best_chi_squared = best_llm_chi_squared
+                if best_llm_n_chi_squared < best_n_chi_squared:
+                    best_n_chi_squared = best_llm_n_chi_squared
                     best_expression = best_llm_expr
                     best_expression_index = i
                     best_fit_type = "LLMsimplified"  # Best fit is from LLM simplification
@@ -682,11 +698,11 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
                 # If all attempts failed
                 print("All LLM simplifications failed to fit properly")
                 final_LLM_expressions.append(None)
-                chi_squared_LLM_finals.append(None)
+                n_chi_squared_LLM_finals.append(None)
         except Exception as e:
             print(f"Skipping LLM improvement. {e}")
             final_LLM_expressions.append(None)
-            chi_squared_LLM_finals.append(None)
+            n_chi_squared_LLM_finals.append(None)
             # Final plot if we have a valid expression
             if best_llm_expr is not None and plot_all:
                 f_fitted = eval(lambda_xi+": "+convert_sympy_to_numpy(best_llm_expr), {"np": np})
@@ -695,25 +711,25 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
         if plot_all:
             ax.legend()
             plt.show()
-        print(f"###############################\n# Final formula for output {i}: #\n###############################\n {best_expression} with a chi^2 of {best_chi_squared:.3e} and from the {best_fit_type} fit (of raw/KANsimplified/LLMsimplified)")
+        print(f"###############################\n# Final formula for output {i}: #\n###############################\n {best_expression} with a chi^2 of {best_n_chi_squared:.3e} and from the {best_fit_type} fit (of raw/KANsimplified/LLMsimplified)")
     
         result_dict = {
             'raw_expression': expr,
             'final_KAN_expression': final_KAN_expressions,
-            'chi_squared_KAN_final': chi_squared_KAN_finals,
+            'n_chi_squared_KAN_final': n_chi_squared_KAN_finals,
             'final_LLM_expression': final_LLM_expressions,
-            'chi_squared_LLM_final': chi_squared_LLM_finals,
+            'n_chi_squared_LLM_final': n_chi_squared_LLM_finals,
             'best_expression': best_expression,
-            'best_chi_squared': best_chi_squared,
+            'best_n_chi_squared': best_n_chi_squared,
             'best_expression_index': best_expression_index,
             'best_fit_type': best_fit_type  # Add the type of the best fit
         }
         results_all_dicts.append(result_dict)
 
     best_expressions = [result_dict['best_expression'] for result_dict in results_all_dicts]
-    best_chi_squareds = [result_dict['best_chi_squared'] for result_dict in results_all_dicts]
+    best_n_chi_squareds = [result_dict['best_n_chi_squared'] for result_dict in results_all_dicts]
     
-    return best_expressions, best_chi_squareds, results_all_dicts
+    return best_expressions, best_n_chi_squareds, results_all_dicts
 
 def plot_results(f, ranges, result_dict, model = None, pruned_model = None, title="KAN Symbolic Regression Results", plotmaxmin = [[None,None],[None,None]]):
     """
@@ -741,12 +757,12 @@ def plot_results(f, ranges, result_dict, model = None, pruned_model = None, titl
     
     # Get the best expression
     best_expr = result_dict['best_expression']
-    best_chi_squared = result_dict['best_chi_squared']
+    best_n_chi_squared = result_dict['best_n_chi_squared']
     
     # Try to plot the best expression
     try:
         y_best = eval(convert_sympy_to_numpy(best_expr), {"np": np, "x0": x})
-        ax.plot(x, y_best, 'r--', label=f'Best Expression (χ²={best_chi_squared:.5e})', linewidth=2)
+        ax.plot(x, y_best, 'r--', label=f'Best Expression (χ²={best_n_chi_squared:.5e})', linewidth=2)
     except Exception as e:
         print(f"Error plotting best expression: {e}")
     
@@ -760,16 +776,16 @@ def plot_results(f, ranges, result_dict, model = None, pruned_model = None, titl
 
 
         simplified_by_KAN_expr = result_dict['final_KAN_expression'][best_idx]
-        chi_squared = result_dict['chi_squared_KAN_final'][best_idx]
+        n_chi_squared = result_dict['n_chi_squared_KAN_final'][best_idx]
         y_simplified = eval(convert_sympy_to_numpy(simplified_by_KAN_expr), {"np": np, "x0": x})
         print('plotting simplified by KAN expression')
-        ax.plot(x, y_simplified, 'g-.', dashes=[3, 1, 1, 1], label=f'Simplified by KAN (χ²={chi_squared:.5e})', linewidth=2)
+        ax.plot(x, y_simplified, 'g-.', dashes=[3, 1, 1, 1], label=f'Simplified by KAN (χ²={n_chi_squared:.5e})', linewidth=2)
 
         simplified_by_LLM_expr = result_dict['final_LLM_expression'][best_idx]
-        chi_squared = result_dict['chi_squared_LLM_final'][best_idx]
+        n_chi_squared = result_dict['n_chi_squared_LLM_final'][best_idx]
         y_simplified = eval(convert_sympy_to_numpy(simplified_by_LLM_expr), {"np": np, "x0": x})
         print('plotting simplified by LLM expression')
-        ax.plot(x, y_simplified, 'c--', dashes=[2, 1], label=f'Simplified by LLM and refitted (χ²={chi_squared:.5e})', linewidth=2)
+        ax.plot(x, y_simplified, 'c--', dashes=[2, 1], label=f'Simplified by LLM and refitted (χ²={n_chi_squared:.5e})', linewidth=2)
     except Exception as e:
         print(f"Error plotting simplified expression: {e}")
     # Try to plot the model and pruned model predictions
@@ -862,7 +878,7 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
         x_data = dataset['train_input'].cpu().numpy().flatten()
         y_data = dataset['train_label'].cpu().numpy().flatten()
         # Optimize and simplify the expression
-        best_expressions, best_chi_squareds, result_dicts = optimize_expression(
+        best_expressions, best_n_chi_squareds, result_dicts = optimize_expression(
             client, node_data, gpt_model, x_data, y_data, 
             custom_system_prompt=custom_system_prompt_for_second_simplification, original_f=f, prune_small_terms=True
         )
@@ -870,10 +886,10 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
 
         # Print the results
         best_index = result_dict['best_expression_index']
-        print(f"best expression: {result_dict['best_expression']}, at index {best_index}, with chi^2 {result_dict['best_chi_squared']}")
+        print(f"best expression: {result_dict['best_expression']}, at index {best_index}, with chi^2 {result_dict['best_n_chi_squared']}")
         print(f"initially: {result_dict['raw_expression'][best_index]}")
-        print(f"refitting all coefficients in KAN: {result_dict['final_KAN_expression'][best_index]}, chi^2 {result_dict['chi_squared_KAN_final'][best_index]}")
-        print(f"simplifying by LLM and refitting again: {result_dict['final_LLM_expression'][best_index]}, chi^2 {result_dict['chi_squared_LLM_final'][best_index]}")
+        print(f"refitting all coefficients in KAN: {result_dict['final_KAN_expression'][best_index]}, chi^2 {result_dict['n_chi_squared_KAN_final'][best_index]}")
+        print(f"simplifying by LLM and refitting again: {result_dict['final_LLM_expression'][best_index]}, chi^2 {result_dict['n_chi_squared_LLM_final'][best_index]}")
         return {
             'trained_model': model,
             'pruned_model': pruned_model,
@@ -883,7 +899,7 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
             'result_dict': result_dict,
             'dataset': dataset,
             'best_expressions': best_expressions,
-            'best_chi_squareds': best_chi_squareds
+            'best_n_chi_squareds': best_n_chi_squareds
         }
     except Exception as e:
         # Return partial results based on what was completed
@@ -904,6 +920,6 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
             results['dataset'] = dataset
         if 'best_expressions' in locals():
             results['best_expressions'] = best_expressions
-            results['best_chi_squareds'] = best_chi_squareds
+            results['best_n_chi_squareds'] = best_n_chi_squareds
         print(f"Error in pipeline: {e}, returning partial results: {list(results.keys())}")
         return results

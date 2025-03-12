@@ -28,7 +28,7 @@ class TestResponse(unittest.TestCase):
     def test_fun_convert(self):
         """Test conversion of string to lambda function"""
         ansatz = "params[0] * x**2 + params[1] * x + params[2]"
-        func, num_params = fun_convert(ansatz)
+        func, num_params, lambda_str = fun_convert(ansatz)
         
         # Test function with some values
         x = np.array([1, 2, 3])

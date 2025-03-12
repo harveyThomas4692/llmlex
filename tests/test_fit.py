@@ -27,14 +27,14 @@ class TestFit(unittest.TestCase):
             return a * x**2 + b * x + c
         
         # Fit the curve
-        params, chi_squared = fit_curve(self.x, self.y, test_func, 3)
+        params, n_chi_squared = fit_curve(self.x, self.y, test_func, 3)
         
         # Check that we get reasonable parameters
         # We expect close to [2, 3, 5] since our test data is 2x^2 + 3x + 5
         np.testing.assert_array_almost_equal(params, np.array([2, 3, 5]), decimal=2)
         
-        # Check that chi-squared is small
-        self.assertLess(chi_squared, 1e-6)
+        # Check that n_chi-squared is small
+        self.assertLess(n_chi_squared, 1e-6)
     
     def test_fit_curve_error_handling(self):
         """Test error handling in fit_curve"""
@@ -50,14 +50,14 @@ class TestFit(unittest.TestCase):
         logger.setLevel(logging.CRITICAL)
         
         try:
-            params, chi_squared = fit_curve(self.x, self.y, bad_func, 3)
+            params, n_chi_squared = fit_curve(self.x, self.y, bad_func, 3)
         finally:
             # Restore original logging level
             logger.setLevel(original_level)
             
         # Check that we get the expected default values
         np.testing.assert_array_equal(params, np.ones(3))
-        self.assertEqual(chi_squared, np.inf)
+        self.assertEqual(n_chi_squared, np.inf)
 
 if __name__ == '__main__':
     unittest.main()
