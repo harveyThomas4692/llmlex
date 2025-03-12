@@ -11,3 +11,5 @@ scikit-learn
 PyYAML
 torch
 pandas
+stopit
+setuptools

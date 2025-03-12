@@ -482,3 +482,4 @@ async def async_call_model(client, model, image, prompt, system_prompt=None):
                     logger.error(f"Error checking credits: {credit_check_error}")
         
         raise
+ 

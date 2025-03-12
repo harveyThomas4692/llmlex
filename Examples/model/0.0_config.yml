@@ -3,7 +3,7 @@ auto_save: true
 base_fun_name: silu
 ckpt_path: ./model
 device: cpu
-grid: 7
+grid: 5
 grid_eps: 0.02
 grid_range:
 - -1
@@ -17,18 +17,18 @@ state_id: 0
 symbolic.funs_name.0:
 - - '0'
 - - '0'
-- - '0'
-- - '0'
 symbolic.funs_name.1:
 - - '0'
   - '0'
-  - '0'
-  - '0'
+symbolic.funs_name.2:
+- - '0'
 symbolic_enabled: false
 width:
 - - 1
   - 0
-- - 4
+- - 2
+  - 0
+- - 1
   - 0
 - - 1
   - 0

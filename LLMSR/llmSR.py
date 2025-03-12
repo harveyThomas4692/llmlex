@@ -3,7 +3,7 @@ from scipy.optimize import curve_fit
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from LLMSR.images import generate_base64_image, generate_base64_image_with_parents
-from LLMSR.llm import get_prompt, call_model, async_rate_limit_api_call, clear_rate_limit_lock, check_key_usage
+from LLMSR.llm import get_prompt, call_model, async_rate_limit_api_call, clear_rate_limit_lock, check_key_usage, async_call_model
 from LLMSR.response import extract_ansatz, fun_convert
 import logging
 import LLMSR.fit as fit
@@ -186,7 +186,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
             # Fit curve to data
             try:
                 logger.debug("Fitting curve to data")
-                params, score = fit.fit_curve(x, y, curve, num_params)
+                params, score = fit.fit_curve(x, y, curve, num_params, allow_using_jax=True)
                 logger.info(f"Fit result: score={-score}, params={params}")
                 stats.stage_success("curve_fitting")
             except Exception as e:
@@ -235,112 +235,114 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
         logger.error("Unknown error in single_call")
         raise RuntimeError("Unknown error in single_call")
 
-@async_rate_limit_api_call
-async def async_model_call(client, model, image, prompt, system_prompt=None):
-    """
-    Asynchronous version of call_model.
-    This function makes a direct async call to the LLM API with rate limiting.
-    """
-    logger.debug(f"Async calling model {model}")
+# @async_rate_limit_api_call
+# async def async_call_model(client, model, image, prompt, system_prompt=None):
+#     """
+#     Asynchronous version of call_model.
+#     This function makes a direct async call to the LLM API with rate limiting.
+#     """
+#     logger.debug(f"Async calling model {model}")
     
-    # Set default system prompt if not provided
-    if system_prompt is None:
-        system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz (formula template). "
-                         "Respond with ONLY the ansatz formula, without any explanation or commentary. Ensure it is in valid python. You may use numpy functions. "
-                         "params is a list of parameters that can be of any length or complexity. Index into it with params[0], params[1], etc. "
-                         "Since the data contains noise, prioritize simpler, more elegant functions that capture the underlying pattern rather than fitting every point. ")
-        logger.debug("Using default system prompt: \n" + system_prompt)
+#     # Set default system prompt if not provided
+#     if system_prompt is None:
+#         system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz (formula template). "
+#                          "Respond with ONLY the ansatz formula, without any explanation or commentary. Ensure it is in valid python. You may use numpy functions. "
+#                          "params is a list of parameters that can be of any length or complexity. Index into it with params[0], params[1], etc. "
+#                          "Since the data contains noise, prioritize simpler, more elegant functions that capture the underlying pattern rather than fitting every point. ")
+#         logger.debug("Using default system prompt: \n" + system_prompt)
     
-    # Track image size for debugging purposes
-    image_size = len(image) if image else 0
-    logger.debug(f"Image size: {image_size} characters (base64)")
-    logger.debug(f"Prompt length: {len(prompt)} characters")
+#     # Track image size for debugging purposes
+#     image_size = len(image) if image else 0
+#     logger.debug(f"Image size: {image_size} characters (base64)")
+#     logger.debug(f"Prompt length: {len(prompt)} characters")
     
-    try:
-        # Create and send the API request asynchronously or synchronously depending on client capabilities
-        logger.debug("Creating async chat completion request")
+#     try:
+#         # Create and send the API request asynchronously or synchronously depending on client capabilities
+#         logger.debug("Creating async chat completion request")
         
-        # Check if the client supports async operations directly
-        if hasattr(client.chat.completions, 'acreate'):
-            # Use the async API if available
-            response = await client.chat.completions.acreate(
-                model=model,
-                messages=[
-                    { "role": "system", 
-                     "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": f"data:image/png;base64,{image}"},
-                            },
-                            {
-                                "type": "text",
-                                "text": prompt,
-                            },
-                        ],
-                    }
-                ],
-                max_tokens=4096,
-            )
-        else:
-            # If no async API is available, use the sync API in a thread pool
-            import concurrent.futures
-            loop = asyncio.get_event_loop()
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                response = await loop.run_in_executor(
-                    pool,
-                    lambda: client.chat.completions.create(
-                        model=model,
-                        messages=[
-                            { "role": "system", 
-                             "content": system_prompt},
-                            {
-                                "role": "user",
-                                "content": [
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {"url": f"data:image/png;base64,{image}"},
-                                    },
-                                    {
-                                        "type": "text",
-                                        "text": prompt,
-                                    },
-                                ],
-                            }
-                        ],
-                        max_tokens=4096,
-                    )
-                )
+#         # Check if the client supports async operations directly
+#         if hasattr(client.chat.completions, 'acreate'):
+#             # Use the async API if available
+#             response = await client.chat.completions.acreate(
+#                 model=model,
+#                 messages=[
+#                     { "role": "system", 
+#                      "content": system_prompt},
+#                     {
+#                         "role": "user",
+#                         "content": [
+#                             {
+#                                 "type": "image_url",
+#                                 "image_url": {"url": f"data:image/png;base64,{image}"},
+#                             },
+#                             {
+#                                 "type": "text",
+#                                 "text": prompt,
+#                             },
+#                         ],
+#                     }
+#                 ],
+#                 max_tokens=4096,
+#             )
+#         else:
+#             # If no async API is available, use the sync API in a thread pool
+#             import concurrent.futures
+#             loop = asyncio.get_event_loop()
+#             with concurrent.futures.ThreadPoolExecutor() as pool:
+#                 response = await loop.run_in_executor(
+#                     pool,
+#                     lambda: client.chat.completions.create(
+#                         model=model,
+#                         messages=[
+#                             { "role": "system", 
+#                              "content": system_prompt},
+#                             {
+#                                 "role": "user",
+#                                 "content": [
+#                                     {
+#                                         "type": "image_url",
+#                                         "image_url": {"url": f"data:image/png;base64,{image}"},
+#                                     },
+#                                     {
+#                                         "type": "text",
+#                                         "text": prompt,
+#                                     },
+#                                 ],
+#                             }
+#                         ],
+#                         max_tokens=4096,
+#                     )
+#                 )
         
-        # Log response info
-        try:
-            if hasattr(response, 'usage'):
-                token_usage = response.usage.total_tokens
-                logger.debug(f"Async model response received. Total tokens: {token_usage}")
+#         # Log response info
+#         try:
+#             if hasattr(response, 'usage'):
+#                 token_usage = response.usage.total_tokens
+#                 logger.debug(f"Async model response received. Total tokens: {token_usage}")
             
-            if hasattr(response, 'choices') and len(response.choices) > 0 and hasattr(response.choices[0], 'finish_reason'):
-                logger.debug(f"Response finish reason: {response.choices[0].finish_reason}")
-        except Exception as e:
-            logger.debug(f"Could not access token usage information: {e}")
+#             if hasattr(response, 'choices') and len(response.choices) > 0 and hasattr(response.choices[0], 'finish_reason'):
+#                 logger.debug(f"Response finish reason: {response.choices[0].finish_reason}")
+#         except Exception as e:
+#             logger.debug(f"Could not access token usage information: {e}")
         
-        # Process response if needed
-        if hasattr(response, 'choices') and len(response.choices) > 0:
-            # Standard OpenAI API response format
-            if hasattr(response.choices[0], 'message') and hasattr(response.choices[0].message, 'content'):
-                # Return just the content for simpler processing later
-                return response.choices[0].message.content
-            elif hasattr(response.choices[0], 'text'):
-                return response.choices[0].text
-            # Fall back to returning the full response object
+#         # Process response if needed
+#         if hasattr(response, 'choices') and len(response.choices) > 0:
+#             # Standard OpenAI API response format
+#             if hasattr(response.choices[0], 'message') and hasattr(response.choices[0].message, 'content'):
+#                 # Return just the content for simpler processing later
+#                 return response.choices[0].message.content
+#             elif hasattr(response.choices[0], 'text'):
+#                 return response.choices[0].text
+#             # Fall back to returning the full response object
         
-        return response
+#         return response
         
-    except Exception as e:
-        # Log and re-raise any exceptions
-        logger.error(f"Error calling model {model} asynchronously: {e}", exc_info=True)
-        raise
+#     except Exception as e:
+#         # Log and re-raise any exceptions
+# #         logger.error(f"Error calling model {model} asynchronously: {e}", exc_info=True)
+# #         raise
+
+#        raise
 
 async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=None, system_prompt=None, max_retries=3, stats=None, plot_parents=False):
     """
@@ -378,14 +380,14 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
             # Get the proper prompt based on function_list
             prompt = get_prompt(function_list)
             if plot_parents:
-                prompt = "\n\nThe listed curve_# functions (faded and broken lines) are plotted on the same image as the data ( which is solid blue lines).\
-                  The coefficients the curve_# functions are plotted with are optimised with gradient descent. Use this information to improve the ansatz." + prompt
+                prompt = "\n\nThe listed curve_# functions (faded and broken lines) are plotted on the same image as the data (solid blue line).\
+                  The coefficients the curve_# functions are plotted with are optimised with gradient descent. Use this information to improve the ansatz.\n" + prompt
                 logger.debug(f"Generating plot for activation function with parents")
                 img = generate_base64_image_with_parents(x, y, function_list)
             
             # Make the LLM call using our async rate-limited function
             try:
-                resp = await async_model_call(client, model, img, prompt, system_prompt)
+                resp = await async_call_model(client, model, img, prompt, system_prompt)
                 stats.stage_success("api_call")
             except Exception as e:
                 stats.stage_failure("api_call", e)
@@ -398,7 +400,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
             
             # Process API response to get text content
             try:
-                # At this point, resp should be a string because we're extracting the content in async_model_call
+                # At this point, resp should be a string because we're extracting the content in async_call_model
                 # But let's be defensive and handle different response formats
                 if isinstance(resp, str):
                     # Direct string response
@@ -443,11 +445,12 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
                 
                 # Try to fit the curve
                 try:
-                    params, chi2 = fit.fit_curve(x, y, f, num_params)
-                    stats.stage_success("curve_fitting")
+                    params, chi2 = fit.fit_curve(x, y, f, num_params, allow_using_jax=True)
                     if chi2 == float('inf'):
                         logger.debug(f"Curve fitting failed: chi2 is infinite {ansatz} {num_params} {f}")# already logged elsewhere
+                        stats.stage_failure("curve_fitting", e)
                         continue
+                    stats.stage_success("curve_fitting")
                 except Exception as e:
                     stats.stage_failure("curve_fitting", e)
                     last_error = e
@@ -506,9 +509,11 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
         logger.error("Unknown error in async_single_call")
         raise RuntimeError("Unknown error in async_single_call")
 
+
+
 def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                 temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5, system_prompt=None, 
-                elite=False, for_kan=False, use_async=True, plot_parents=False, demonstrate_parent_plotting=False):
+                elite=False, for_kan=False, use_async=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False):
     """
         Run a genetic algorithm to fit a model to the given data.
         Parameters:
@@ -526,6 +531,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
             use_async (bool, optional): Whether to use async calls for population generation. Default is True.
             plot_parents (bool, optional): Whether to plot the parents in the genetic algorithm, showing the model the shape of the optimize parents. Default is False.
             demonstrate_parent_plotting (bool, optional): Whether to show to the user an example of the parent plotting. Default is False.
+            constant_on_failure (bool, optional): Whether to return the constant function if the genetic algorithm fails. Default is False.
         Returns:
             list: A list of populations, where each population is a list of individuals.
         """
@@ -645,6 +651,21 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     if not population:
         error_msg = "Failed to generate any valid population members after multiple attempts"
         logger.error(error_msg)
+        
+        # If constant_on_failure is True, return the constant function
+        if constant_on_failure:
+            logger.info(f"Returning constant function as fallback (constant_on_failure=True). Score: {chi_squared}, constant: {params}")
+            populations.append([{
+                "params": params,
+                "score": -chi_squared,
+                "ansatz": "params[0]" if for_kan else "params[0]",
+                "Num_params": 0,
+                "response": None,
+                "prompt": None,
+                "function_list": None
+            }])
+            return populations
+        
         raise RuntimeError(error_msg)
     
     # Handle NaN and infinite scores
@@ -784,6 +805,23 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                 if not good:
                     logger.error(f"Failed to generate individual {funcs+1} after {attempts} attempts")
         
+        # Check if we have a valid population after this generation
+        if not population:
+            error_msg = f"Failed to generate any valid population members in generation {generation+1}"
+            logger.error(error_msg)
+            
+            # If constant_on_failure is True, return the constant function
+            if constant_on_failure:
+                logger.info(f"Returning constant function as fallback (constant_on_failure=True). Score: {chi_squared}, constant: {params}")
+                populations.append([{
+                    "params": params,
+                    "score": -chi_squared,
+                    "ansatz": "params[0]" if for_kan else "params[0]",
+                    "Num_params": 0,
+                    "response": None,
+                    "prompt": None,
+                    "function_list": None
+                }])
         population.sort(key=lambda x: x['score'])
         best_pop = population[-1]
         populations.append(population)
@@ -807,7 +845,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     return populations
 
 
-def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False):
+def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False):
     """
     Converts a given kan model symbolic representations using llmsr.
     Parameters:
@@ -827,7 +865,7 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
     logger.debug(f"Starting KAN to symbolic conversion with population={population}, generations={generations}")
     logger.debug(f"KAN model has {len(model.width_in)} layers")
 
-    res, res_fcts = 'Sin', {}
+    res_fcts = {}
     
     # Initialize symb_formula to hold placeholders for all connections
     symb_formula = []
@@ -911,7 +949,7 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                             temperature=temperature, model=gpt_model, 
                             system_prompt=None, elite=False, 
                             exit_condition=exit_condition, for_kan=True,
-                            use_async=use_async, plot_parents=plot_parents
+                            use_async=use_async, plot_parents=plot_parents,demonstrate_parent_plotting=demonstrate_parent_plotting, constant_on_failure=constant_on_failure
                         )
                         res_fcts[(l,i,j)] = res
                         logger.info(f"Successfully found expression for connection ({l},{i},{j})")

@@ -93,7 +93,7 @@ class TestLLMSR(unittest.TestCase):
         np.testing.assert_array_equal(result['params'], np.array([2, 3, 5]))
         self.assertEqual(result['score'], -0.001)
 
-    @patch('LLMSR.llmSR.async_model_call')
+    @patch('LLMSR.llmSR.async_call_model')
     def test_async_single_call(self, mock_async_model_call):
         """Test the async_single_call function with a mocked LLM response"""
         

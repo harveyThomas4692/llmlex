@@ -161,7 +161,7 @@ class TestLogging(unittest.TestCase):
         curve = lambda x, *params: params[0] * x**params[1]
         
         # Call the function
-        result = LLMSR.fit.fit_curve(x, y, curve, 2)
+        result = LLMSR.fit.fit_curve(x, y, curve, 2, allow_using_jax=True)
         
         # Verify logs
         log_content = self.log_capture.getvalue()
