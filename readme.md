@@ -3,16 +3,16 @@ LLM_SR is a Python library for symbolic regression using vision-capable Large La
 
 Our custom scoring function is a robust, scale-invariant "normalized chi-squared" that handles both large and small values gracefully:
 
-$$n\_\chi^2 = \frac{1}{N}\sum_{i=1}^{N}\frac{(y_i - \hat{y}_i)^2}{\max(\text{global\_scale}, \alpha |y_i|)^2}$$
+$$n\_\chi^2 = \frac{1}{N}\sum_{i=1}^{N}\frac{(y_i - \hat{y}_i)^2}{\max(\text{global\\_scale}, \alpha |y_i|)^2}$$
 
 where:
 - $y_i$ are the actual values
 - $\hat{y}_i$ are the predicted values
-- $\text{global\_scale} = \max(\text{MAD}_y, \alpha \cdot \text{mean}(|y|), \epsilon)$ - a global scale measure that never collapses to zero
+- $\text{global\\_scale} = \max(\text{MAD}_y, \alpha \cdot \text{mean}(|y|), \epsilon)$ - a global scale measure that never collapses to zero
 - $\text{MAD}_y$ is the median absolute deviation: $\text{median}(|y_i - \text{median}(y_i)|)$
 - $\alpha$ is a small fraction (default 0.01)
 - $\epsilon$ is a small constant (default 1e-4) to prevent division by zero
-- The denominator $\max(\text{global\_scale}, \alpha |y_i|)^2$ provides a local scale adjustment
+- The denominator $\max(\text{global\\_scale}, \alpha |y_i|)^2$ provides a local scale adjustment
 
 This metric smoothly transitions between absolute and relative error regimes. It should remain well-behaved even when variances and values approach zero.
 
