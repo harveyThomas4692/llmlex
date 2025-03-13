@@ -5,6 +5,8 @@ import base64
 import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
+import tempfile
+from PIL import Image
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
@@ -15,33 +17,42 @@ from tests.test_data.generate_test_data import generate_test_data
 class TestImages(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Generate test data if it doesn't exist
-        if not os.path.exists('tests/test_data/test_data.npz'):
-            cls.x, cls.y, cls.base64_image = generate_test_data()
-        else:
-            # Load existing test data
-            test_data = np.load('tests/test_data/test_data.npz')
-            cls.x, cls.y = test_data['x'], test_data['y']
-            with open('tests/test_data/test_image.txt', 'r') as f:
-                cls.base64_image = f.read()
+        # Generate test data
+        cls.x = np.linspace(0, 10, 100)
+        cls.y = 2 * cls.x**2 + 3 * cls.x + 5
+        
+        # Create a test image file
+        cls.test_image_path = os.path.join(tempfile.gettempdir(), 'test_image.png')
+        fig, ax = plt.subplots()
+        ax.plot(cls.x, cls.y)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.grid(True)
+        fig.savefig(cls.test_image_path)
+        plt.close(fig)
+    
+    @classmethod
+    def tearDownClass(cls):
+        # Clean up temporary files
+        if os.path.exists(cls.test_image_path):
+            os.remove(cls.test_image_path)
     
     def test_encode_image(self):
         """Test encoding an image to base64"""
-        # This test requires that test_plot.png exists
-        if not os.path.exists('tests/test_data/test_plot.png'):
-            generate_test_data()
+        encoded = encode_image(self.test_image_path)
         
-        encoded = encode_image('tests/test_data/test_plot.png')
         # Check that the result is a non-empty string
         self.assertIsInstance(encoded, str)
         self.assertTrue(len(encoded) > 0)
         
         # Check that it can be decoded as base64
-        try:
-            decoded = base64.b64decode(encoded)
-            self.assertTrue(len(decoded) > 0)
-        except Exception as e:
-            self.fail(f"Base64 decoding failed: {e}")
+        decoded = base64.b64decode(encoded)
+        self.assertTrue(len(decoded) > 0)
+        
+        # Verify the decoded content is a valid image
+        image = Image.open(BytesIO(decoded))
+        self.assertTrue(image.width > 0)
+        self.assertTrue(image.height > 0)
     
     def test_generate_base64_image(self):
         """Test generating a base64 image from a matplotlib figure"""
@@ -53,13 +64,20 @@ class TestImages(unittest.TestCase):
         self.assertTrue(len(base64_img) > 0)
         
         # Check that it can be decoded as base64
-        try:
-            decoded = base64.b64decode(base64_img)
-            self.assertTrue(len(decoded) > 0)
-        except Exception as e:
-            self.fail(f"Base64 decoding failed: {e}")
+        decoded = base64.b64decode(base64_img)
+        self.assertTrue(len(decoded) > 0)
+        
+        # Verify the decoded content is a valid image
+        image = Image.open(BytesIO(decoded))
+        self.assertTrue(image.width > 0)
+        self.assertTrue(image.height > 0)
         
         plt.close(fig)
+    
+    def test_encode_image_error_handling(self):
+        """Test that encode_image properly handles missing files"""
+        with self.assertRaises(FileNotFoundError):
+            encode_image('nonexistent_file.png')
 
 if __name__ == '__main__':
     unittest.main()

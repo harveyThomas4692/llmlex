@@ -108,10 +108,10 @@ def build_expression_tree(model, symb_expr_sorted, top_k=3):
     tmp.symbolic_expressions = symb_expr_sorted
     return tmp.build_expression_tree(top_k)
 
-def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, custom_system_prompt=None, original_f=None, prune_small_terms=True, plot_all=True, num_prompts_per_attempt=3, timeout_simplify=10):
-    """DEPRECATED: Use KANSR.optimize_expressions instead."""
+def optimise_expression(client, full_expressions, gpt_model, x_data, y_data, custom_system_prompt=None, original_f=None, prune_small_terms=True, plot_all=True, num_prompts_per_attempt=3, timeout_simplify=10):
+    """DEPRECATED: Use KANSR.optimise_expressions instead."""
     warnings.warn(
-        "optimize_expression is deprecated. Use KANSR.optimize_expressions instead.",
+        "optimise_expression is deprecated. Use KANSR.optimise_expressions instead.",
         DeprecationWarning,
         stacklevel=2
     )
@@ -120,13 +120,13 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
     
     # Set up the node_tree if full_expressions is a dict
     if isinstance(full_expressions, dict) and "full_expressions" in full_expressions:
-        tmp.node_tree = full_expressions
+        tmp.expression_tree = full_expressions
         full_expressions = full_expressions["full_expressions"]
     else:
         # Create a minimal node_tree with just the full_expressions
-        tmp.node_tree = {"full_expressions": full_expressions if isinstance(full_expressions, list) else [full_expressions]}
+        tmp.expression_tree = {"full_expressions": full_expressions if isinstance(full_expressions, list) else [full_expressions]}
     
-    return tmp.optimize_expressions(
+    return tmp.optimise_expressions(
         client, gpt_model, x_data, y_data, 
         custom_system_prompt=custom_system_prompt, 
         original_f=original_f, 

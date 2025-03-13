@@ -473,8 +473,8 @@ class TestKanSrFunctions(unittest.TestCase):
             
         self.create_mock_kan = create_mock_kan
         
-    def test_optimize_expression(self):
-        """Test optimize_expression function for processing expressions and curve fitting."""
+    def test_optimise_expression(self):
+        """Test optimise_expression function for processing expressions and curve fitting."""
         # Create synthetic data for a simple quadratic function: f(x) = 2*x^2 + 3
         x_data = np.linspace(-5, 5, 100)
         y_data = 2 * x_data**2 + 3
@@ -501,7 +501,7 @@ class TestKanSrFunctions(unittest.TestCase):
         # Patch the plotting to avoid display issues during tests
         with patch.object(plt, 'show'), patch.object(plt, 'close'):
             # Call the actual function with our test data - only the API call is mocked
-            best_expressions, best_n_chi_squared, result_dicts = kan_sr.optimize_expression(
+            best_expressions, best_n_chi_squared, result_dicts = kan_sr.optimise_expression(
                 self.mock_client,
                 [test_expression],
                 "openai/gpt-4o",
@@ -557,8 +557,8 @@ class TestKanSrFunctions(unittest.TestCase):
             self.assertLess(best_n_chi_squared[0], 0.1, 
                           "n_chi-squared value should be small for a good fit")
     
-    def test_optimize_expression_with_multiple_expressions(self):
-        """Test optimize_expression with multiple input expressions."""
+    def test_optimise_expression_with_multiple_expressions(self):
+        """Test optimise_expression with multiple input expressions."""
         # Since we're having issues with the curve_fit function handling multidimensional arrays,
         # let's combine multiple tests into a single test with one expression
         
@@ -583,7 +583,7 @@ class TestKanSrFunctions(unittest.TestCase):
         # Patch the plotting to avoid display issues during tests
         with patch.object(plt, 'show'), patch.object(plt, 'close'):
             # Call the actual function with our test data - only the API call is mocked
-            best_expressions, best_n_chi_squared, result_dicts = kan_sr.optimize_expression(
+            best_expressions, best_n_chi_squared, result_dicts = kan_sr.optimise_expression(
                 self.mock_client,
                 [test_expression],
                 "openai/gpt-4o",
@@ -624,7 +624,7 @@ class TestKanSrFunctions(unittest.TestCase):
                                     err_msg="Fitted function should be close to the true function")
     
     def test_curve_fitting_mathematical_correctness(self):
-        """Test the mathematical correctness of curve fitting in optimize_expression."""
+        """Test the mathematical correctness of curve fitting in optimise_expression."""
         # Create a more complex data pattern with sinusoidal components
         # Using 1D arrays to avoid issues with curve_fit
         x_data = np.linspace(-np.pi, np.pi, 200)
@@ -648,7 +648,7 @@ class TestKanSrFunctions(unittest.TestCase):
         # Patch the plotting functions to avoid display during tests
         with patch.object(plt, 'show'), patch.object(plt, 'close'):
             # Run the real function (not mocked), but with mocked API call
-            best_expressions, best_n_chi_squared, result_dicts = kan_sr.optimize_expression(
+            best_expressions, best_n_chi_squared, result_dicts = kan_sr.optimise_expression(
                 self.mock_client,
                 [test_expression],
                 "openai/gpt-4o",
@@ -748,7 +748,7 @@ class TestKanSrFunctions(unittest.TestCase):
              patch('LLMSR.llmSR.kan_to_symbolic') as mock_kan_to_symbolic, \
              patch('LLMSR.old_kan_sr.sort_symb_expr') as mock_sort, \
              patch('LLMSR.old_kan_sr.build_expression_tree') as mock_build_tree, \
-             patch('LLMSR.old_kan_sr.optimize_expression') as mock_optimize, \
+             patch('LLMSR.old_kan_sr.optimise_expression') as mock_optimise, \
              patch('LLMSR.old_kan_sr.plot_results') as mock_plot, \
              patch('LLMSR.old_kan_sr.plt.show'):
             
@@ -775,7 +775,7 @@ class TestKanSrFunctions(unittest.TestCase):
                 'full_expressions': ['x0**2']
             }
             
-            # Mock optimization results
+            # Mock optimisation results
             best_expressions = ['x0**2']
             best_n_chi_squared = [0.0001]
             result_dict = {
@@ -787,7 +787,7 @@ class TestKanSrFunctions(unittest.TestCase):
                 'best_expression': 'x0**2',
                 'best_n_chi_squared': 0.00005,
             }
-            mock_optimize.return_value = (best_expressions, best_n_chi_squared, [result_dict])
+            mock_optimise.return_value = (best_expressions, best_n_chi_squared, [result_dict])
             
             # Mock plotting
             mock_fig, mock_ax = MagicMock(), MagicMock()
@@ -825,7 +825,7 @@ class TestKanSrFunctions(unittest.TestCase):
             mock_kan_to_symbolic.assert_called_once()
             mock_sort.assert_called_once()
             mock_build_tree.assert_called_once()
-            mock_optimize.assert_called_once()
+            mock_optimise.assert_called_once()
             
             # Don't verify plot_results is called since we set plot_fit=False
             # mock_plot.assert_called_once()

@@ -198,6 +198,7 @@ class APICallStats:
             
             # Extraction errors
             "no_parameters": 0,
+            "llm_refusal": 0,
             "invalid_response": 0,
             "empty_response": 0,
             
@@ -313,6 +314,8 @@ class APICallStats:
             self.error_types["timeout"] += 1
             
         # Extraction errors
+        elif isinstance(error, ValueError) and "no parameters found" in error_str and any(phrase in error_str.lower() for phrase in ["can't assist", "can't help", "i'm sorry", "i apologise"]):
+            self.error_types["llm_refusal"] += 1
         elif isinstance(error, ValueError) and "no parameters found" in error_str:
             self.error_types["no_parameters"] += 1
         elif isinstance(error, ValueError) and any(term in error_str for term in ["format", "unexpected", "not recognized"]):
@@ -393,7 +396,7 @@ class APICallStats:
         # Group error types by category
         categories = {
             "API Errors": ["rate_limit", "api_connection", "timeout"],
-            "Extraction Errors": ["no_parameters", "invalid_response", "empty_response"],
+            "Extraction Errors": ["no_parameters", "invalid_response", "empty_response", "llm_refusal"],
             "Function Errors": ["syntax_error", "name_error", "type_error"],
             "Fitting Errors": ["convergence_error", "singular_matrix", "numerical_error"],
             "Other": ["other"]

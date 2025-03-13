@@ -1,10 +1,22 @@
 # LLM_SR
+LLM_SR is a Python library for symbolic regression using vision-capable Large Language Models. It finds mathematical formulae to fit your data by visualizing them as graphs and using LLMs to suggest equations. I recommend using the `uv` package manager to install the package - it's so much faster than pip!
 
-LLM_SR is a Python library for symbolic regression using vision-capable Large Language Models. It finds mathematical formulas to fit your data by visualizing it as graphs and leveraging LLMs to suggest equations. I recommend using the uv package manager to install the package - it's so much faster than pip!
+Our custom scoring function is a robust, scale-invariant "normalized chi-squared" that handles both large and small values gracefully:
+
+$$n\_\chi^2 = \frac{1}{N}\sum_{i=1}^{N}\frac{(y_i - \hat{y}_i)^2}{\max(\text{global\_scale}, \alpha |y_i|)^2}$$
+
+where:
+- $y_i$ are the actual values
+- $\hat{y}_i$ are the predicted values
+- $\text{global\_scale} = \max(\text{MAD}_y, \alpha \cdot \text{mean}(|y|), \epsilon)$ - a global scale measure that never collapses to zero
+- $\text{MAD}_y$ is the median absolute deviation: $\text{median}(|y_i - \text{median}(y_i)|)$
+- $\alpha$ is a small fraction (default 0.01)
+- $\epsilon$ is a small constant (default 1e-4) to prevent division by zero
+- The denominator $\max(\text{global\_scale}, \alpha |y_i|)^2$ provides a local scale adjustment
+
+This metric smoothly transitions between absolute and relative error regimes. It should remain well-behaved even when variances and values approach zero.
 
 ## Installation
-
-```bash
 (uv) pip install .
 ```
 
@@ -26,7 +38,7 @@ import os
 # Set up API client
 client = openai.OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY") if os.getenv("OPENROUTER_API_KEY") else "your_api_key", 
+    api_key=os.getenv("OPENROUTER_API_KEY") if os.getenv("OPENROUTER_API_KEY") else "<<<<<<your_api_key>>>>>>>", 
 )
 
 # Generate data
@@ -68,33 +80,40 @@ model = KAN(width=[2,1,1,1], grid=7, k=3, seed=0, device=device)
 
 # Create dataset
 f = lambda x: torch.exp(torch.sin(torch.pi*x[:,[0]]) + x[:,[1]]**2) # should be a torch function
-dataset = create_dataset(f, n_var=2, train_num=1000, test_num=100, device=device)
-model.fit(dataset, opt="LBFGS", steps=100)
-
-# Convert KAN model to symbolic expressions
-sym_expr = LLMSR.kan_to_symbolic(
-    model, client, 
-    population=10, generations=3,
-    gpt_model="openai/gpt-4o", 
-    exit_condition=1e-3, 
-    use_async=True
+#Initialize a KANSR instance for the multivariate function
+multivariate_kansr = KANSR(
+    client=client,
+    width=[2,5,1 1],  # 2 inputs, 5 hidden nodes, 1 output
+    grid=5,
+    k=3,
+    seed=42
+)
+# Create a dataset for the multivariate function
+multivariate_dataset = multivariate_kansr.create_dataset(
+    f=multivariate_function,
+    ranges=(-3, 3),  # Same range for both variables
+    n_var=2,  # Two input variables
+    train_num=10000,
+    test_num=1000
 )
 
-# Generate a callable Python function from symbolic expressions
-learned_f_string, total_params, best_params = LLMSR.llmSR.generate_learned_f(sym_expr)
-exec(learned_f_string)  # Creates learned_f function
-
-# Optimize parameters with curve_fit
-from scipy.optimize import curve_fit
-popt, _ = curve_fit(
-    learned_f, 
-    (dataset['train_input'].cpu().numpy()[:,0], dataset['train_input'].cpu().numpy()[:,1]), 
-    dataset['train_label'].cpu().numpy().flatten(), 
-    p0=best_params
+# Convert to symbolic expressions
+best_expressions, best_chi_squareds, results_dicts, results_all_dicts = multivariate_kansr.get_symbolic(
+    client=client,
+    population=10,
+    generations=5,
+    temperature=0.1,
+    gpt_model="openai/gpt-4o",
+    verbose=1,
+    use_async=True,
+    plot_fit=True,
+    plot_parents=True,
+    demonstrate_parent_plotting=True,
+    train_steps=500
 )
 ```
 
-`generate_learned_f` finds the optimised paramters for the symbolic expression, but does not simplify the expression. For that, use `optimize_expression` in `kan_sr.py`, or `run_complete_pipeline` for a complete end-to-end pipeline.
+`KANSR.generate_learned_f_function` finds the symbolic expression expressed as a python program, but does not simplify the expression. For that, use `optimise_expression` in the KANSR class, or `run_complete_pipeline` for a complete end-to-end pipeline.
 
 For a complete end-to-end symbolic regression pipeline using KANs, use the `run_complete_pipeline` function, or see the example notebook `Examples/kan_sr_example.ipynb`.
 

@@ -464,9 +464,9 @@ def build_expression_tree(model, symb_expr_sorted, top_k=3):
     }
 
 
-def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, custom_system_prompt=None, original_f = None, prune_small_terms =True , plot_all=True,num_prompts_per_attempt:int=3, timeout_simplify:int=10):
+def optimise_expression(client, full_expressions, gpt_model, x_data, y_data, custom_system_prompt=None, original_f = None, prune_small_terms =True , plot_all=True,num_prompts_per_attempt:int=3, timeout_simplify:int=10):
     """
-    Optimize and simplify the final expressions.
+    Optimise and simplify the final expressions.
     
     For each output in the full expression, the function:
       - Prunes and simplifies the expression (replacing floats with parameters and rounding coefficients).
@@ -596,7 +596,7 @@ def optimize_expression(client, full_expressions, gpt_model, x_data, y_data, cus
         except RuntimeError as e:
             params_opt = params_initial
             n_chi_squared = get_n_chi_squared(x_data, y_data, curve_np, params_opt)
-            print(f"All fits failed, proceeding with unoptimized parameters {e}, n_chi-squared with unoptimized parameters: {n_chi_squared:.4e}")
+            print(f"All fits failed, proceeding with unoptimised parameters {e}, n_chi-squared with unoptimised parameters: {n_chi_squared:.4e}")
         # Prune and simplify the refitted model.
         if prune_small_terms:
             prune_amount = 1e-6 if prune_small_terms==True else prune_amount
@@ -738,7 +738,7 @@ def plot_results(f, ranges, result_dict, model = None, pruned_model = None, titl
     Args:
         f: Original function
         ranges: Tuple of (min_x, max_x) for the input range
-        result_dict: Dictionary with results from optimize_expression
+        result_dict: Dictionary with results from optimise_expression
         model: KAN model
         pruned_model: Pruned KAN model
         title: Plot title
@@ -816,7 +816,7 @@ def plot_results(f, ranges, result_dict, model = None, pruned_model = None, titl
 
 def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid=7, k=3, 
                          train_steps=50, generations=3, gpt_model="openai/gpt-4o", device='cpu',
-                         node_th=0.2, edge_th=0.2, custom_system_prompt_for_second_simplification=None, optimizer="LBFGS", population=10, temperature=0.1,
+                         node_th=0.2, edge_th=0.2, custom_system_prompt_for_second_simplification=None, optimiser="LBFGS", population=10, temperature=0.1,
                         exit_condition=None, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, seed=17):
     """
     Run the complete KAN symbolic regression pipeline on a univariate function.
@@ -856,7 +856,7 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
         dataset = create_dataset(f, n_var=1, ranges=ranges, train_num=10000, test_num=1000, device=device)
 
         # Train the model
-        res = model.fit(dataset, opt=optimizer, steps=train_steps)
+        res = model.fit(dataset, opt=optimiser, steps=train_steps)
         
         # Prune the model
         pruned_model = model.prune(node_th=node_th, edge_th=edge_th)
@@ -873,12 +873,12 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
         
         # 5. Build expression tree
         node_data = build_expression_tree(pruned_model, symb_expr_sorted, top_k=3)
-        # 6. Optimize expression
-        # Convert training data to numpy arrays for optimization
+        # 6. Optimise expression
+        # Convert training data to numpy arrays for optimisation
         x_data = dataset['train_input'].cpu().numpy().flatten()
         y_data = dataset['train_label'].cpu().numpy().flatten()
-        # Optimize and simplify the expression
-        best_expressions, best_n_chi_squareds, result_dicts = optimize_expression(
+        # Optimise and simplify the expression
+        best_expressions, best_n_chi_squareds, result_dicts = optimise_expression(
             client, node_data, gpt_model, x_data, y_data, 
             custom_system_prompt=custom_system_prompt_for_second_simplification, original_f=f, prune_small_terms=True
         )

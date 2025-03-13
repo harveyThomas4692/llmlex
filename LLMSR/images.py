@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import logging
 import os
 from LLMSR.response import fun_convert
+from scipy.optimize import curve_fit
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 # Get module logger
 logger = logging.getLogger("LLMSR.images")
 
@@ -203,3 +207,57 @@ def generate_base64_image_with_parents( x, y, parent_functions, fig = None, ax =
     except Exception as e:
         logger.error(f"Error generating base64 image with parents: {e}", exc_info=True)
         raise
+
+
+
+def plot_3d_function(x0_range, x1_range, z_values, test_data, title, cmap='viridis', ax=None):
+    """
+    Plot a 3D surface with test data points.
+    
+    Args:
+        x0_range (numpy.ndarray): Range of values for the first input dimension.
+        x1_range (numpy.ndarray): Range of values for the second input dimension.
+        z_values (numpy.ndarray): 2D array of function values corresponding to the meshgrid of x0_range and x1_range.
+        test_data (tuple): Tuple containing (test_x0, test_x1, test_y) arrays of test data points.
+        title (str): Title for the plot.
+        cmap (str, optional): Colormap to use for the surface. Defaults to 'viridis'.
+        ax (matplotlib.axes.Axes, optional): Existing axes to plot on. If None, creates new figure and axes.
+        
+    Returns:
+        tuple: (surf, ax) where surf is the plotted surface and ax is the matplotlib axes object.
+    """
+    if ax is None:
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+    
+    # Create meshgrid for plotting
+    X0, X1 = np.meshgrid(x0_range, x1_range)
+    
+    # Plot the function surface
+    surf = ax.plot_surface(X0, X1, z_values, cmap=cmap, alpha=0.8, 
+                          linewidth=0, antialiased=True)
+    
+    # Plot the actual test data points
+    test_x0, test_x1, test_y = test_data
+    ax.scatter(test_x0, test_x1, test_y, c='red', marker='o', s=10, label='True data')
+    
+    # Add labels and title
+    ax.set_xlabel('X0', fontsize=12, labelpad=10)
+    ax.set_ylabel('X1', fontsize=12, labelpad=10)
+    ax.set_zlabel('Y', fontsize=12, labelpad=10)
+    ax.set_title(title, fontsize=14, pad=20)
+    
+    # Add colorbar
+    cbar = plt.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+    cbar.set_label('Function Value', fontsize=12)
+    
+    # Add legend
+    ax.legend(loc='upper right', fontsize=10)
+    
+    return surf, ax
+
+def calculate_mse(func, params, inputs, true_outputs):
+    """Calculate mean squared error between function predictions and true values."""
+    predictions = np.array([func((x0, x1), *params) for x0, x1 in zip(inputs[0], inputs[1])])
+    mse = np.mean((predictions - true_outputs)**2)
+    return mse, predictions

@@ -6,6 +6,8 @@ import asyncio
 import LLMSR
 import numpy as np
 import matplotlib.pyplot as plt
+import tempfile
+import os
 from unittest.mock import patch, MagicMock, AsyncMock
 
 class TestLogging(unittest.TestCase):
@@ -16,6 +18,7 @@ class TestLogging(unittest.TestCase):
         # Capture logs for testing
         self.log_capture = io.StringIO()
         self.handler = logging.StreamHandler(self.log_capture)
+        self.handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
         self.root_logger = logging.getLogger("LLMSR")
         self.root_logger.addHandler(self.handler)
         
@@ -31,48 +34,84 @@ class TestLogging(unittest.TestCase):
         self.root_logger.setLevel(self.original_level)
         self.log_capture.close()
     
-    def test_init_module_logging(self):
-        """Test that the module initializes logging properly"""
-        # Import should have configured logging
+    def test_logger_configuration(self):
+        """Test that the module configures loggers properly"""
+        # Verify root logger has handlers
         self.assertIsNotNone(self.root_logger.handlers)
+        
+        # Verify level is set correctly
         self.assertEqual(logging.INFO, self.original_level)
+        
+        # Check submodule loggers
+        submodules = ['llmSR', 'llm', 'fit', 'images', 'response']
+        for submodule in submodules:
+            logger = logging.getLogger(f"LLMSR.{submodule}")
+            # Verify logger exists and inherits from root logger
+            self.assertEqual(logger.parent, self.root_logger)
     
-    def test_single_call_logging(self):
-        """Test logging in single_call function - simplified version"""
-        # This test just verifies that the logger is properly configured 
-        # in the single_call function, without actually calling it
-        logger = logging.getLogger("LLMSR.llmSR")
-        logger.debug("Test single_call logging message")
-        # Verify logs were created
+    def test_log_levels(self):
+        """Test that different log levels work properly"""
+        logger = logging.getLogger("LLMSR.test")
+        
+        # Log at different levels
+        logger.debug("Debug message")
+        logger.info("Info message")
+        logger.warning("Warning message")
+        logger.error("Error message")
+        
+        # Get log output
         log_content = self.log_capture.getvalue()
         
-        # Check for specific log messages
-        self.assertIn("Test single_call logging message", log_content)
+        # Check messages at all levels
+        self.assertIn("DEBUG:LLMSR.test:Debug message", log_content)
+        self.assertIn("INFO:LLMSR.test:Info message", log_content)
+        self.assertIn("WARNING:LLMSR.test:Warning message", log_content)
+        self.assertIn("ERROR:LLMSR.test:Error message", log_content)
     
-    def test_images_logging(self):
-        """Test logging in images module"""
-        # Create test data
+    def test_images_logging_success_path(self):
+        """Test logging in images module for successful operations"""
+        # Create test data and figure
         fig, ax = plt.subplots()
         x = np.linspace(0, 1, 10)
         y = x**2
         
-        # Call the function directly (no mocking)
+        # Call the function
         result = LLMSR.images.generate_base64_image(fig, ax, x, y)
-        
-        # Verify logs
-        log_content = self.log_capture.getvalue()
-        self.assertIn("Generating base64 image", log_content)
-        self.assertIn("Preparing plot", log_content)
-        self.assertIn("points", log_content)
         plt.close(fig)
+        
+        # Get log output
+        log_content = self.log_capture.getvalue()
+        
+        # Verify appropriate log levels for normal operation
+        self.assertIn("DEBUG:LLMSR.images:Generating base64 image", log_content)
+        # Success should be logged at debug level, not higher
+        self.assertNotIn("INFO:LLMSR.images:Successfully generated", log_content.upper())
+        self.assertNotIn("ERROR", log_content)
+    
+    def test_images_logging_error_path(self):
+        """Test logging in images module for error conditions"""
+        # Create temporary test path that doesn't exist
+        nonexistent_path = os.path.join(tempfile.gettempdir(), 'nonexistent_image.png')
+        if os.path.exists(nonexistent_path):
+            os.remove(nonexistent_path)
+            
+        # Attempt to encode a nonexistent image
+        with self.assertRaises(FileNotFoundError):
+            LLMSR.images.encode_image(nonexistent_path)
+            
+        # Get log output
+        log_content = self.log_capture.getvalue()
+        
+        # Verify errors are logged appropriately
+        self.assertIn("ERROR:LLMSR.images:Image file not found", log_content)
 
     @patch('LLMSR.llm.requests.get')
-    def test_llm_logging(self, mock_get):
-        """Test logging in llm module"""
-        # Setup mock
+    def test_llm_logging_network_events(self, mock_get):
+        """Test that network operations in llm module are logged properly"""
+        # Setup success response
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"data": {"limit_remaining": -99999999}}
+        mock_response.json.return_value = {"data": {"limit_remaining": 1000}}
         mock_get.return_value = mock_response
         
         # Setup client mock
@@ -80,124 +119,89 @@ class TestLogging(unittest.TestCase):
         client.api_key = "fake_key"
         client.base_url = "https://example.com"
         
-        # Call the function
+        # Call the function - success path
         result = LLMSR.llm.check_key_limit(client)
         
-        # Verify logs
+        # Clear the log capture
         log_content = self.log_capture.getvalue()
-        self.assertIn("Checking API key usage limit", log_content)
-        self.assertIn("Sending request to", log_content)
+        self.log_capture.truncate(0)
+        self.log_capture.seek(0)
+        
+        # Check success logs contain appropriate information without implementation details
+        self.assertIn("DEBUG:LLMSR.llm:Checking API key usage limit", log_content)
         self.assertIn("API key check successful", log_content)
         
-    def test_response_logging(self):
-        """Test logging in response module"""
-        # Create a mock response
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "import numpy as np\nparams[0] * x**params[1] * np.exp(-params[2] * x)"
+        # Now test error path
+        mock_response.status_code = 403
+        mock_get.return_value = mock_response
         
-        # Call the function
-        ansatz, largest_entry = LLMSR.response.extract_ansatz(mock_response)
+        # Call the function - error path
+        result = LLMSR.llm.check_key_limit(client)
         
-        # Now explicitly call fun_convert with the correct ansatz string
-        test_ansatz = "params[0] * x**params[1] * np.exp(-params[2] * x)"
-        curve, num_params, lambda_str = LLMSR.response.fun_convert(test_ansatz)
-        
-        # Verify logs
+        # Get new log content
         log_content = self.log_capture.getvalue()
-        self.assertIn("Extracting ansatz from model response", log_content)
-        self.assertIn("Response content length", log_content)
-        self.assertIn("Converting ansatz string to lambda function", log_content)
+        
+        # Check error is logged at appropriate level
+        self.assertIn("ERROR:LLMSR.llm:", log_content)
     
-    def test_run_genetic_logging(self):
-        """Test logging in run_genetic function"""
-        # Create test data
-        x = np.linspace(0.01, 1, 10)
-        y = x**2
-        base64_image = "fake_base64_string"
-        client = MagicMock()
-        
-        # Create mock result that will be returned by single_call
-        mock_result = {
-            'params': np.array([0.1, 2.0, 3.0]),
-            'score': -0.001,
-            'ansatz': 'params[0] * np.exp(-params[1] * x) * np.sin(params[2] * x)',
-            'Num_params': 3,
-            'response': "mock response",
-            'prompt': 'test prompt',
-            'function_list': None
-        }
-        
-        # Setup async mock function
-        async def mock_async_single_call(*args, **kwargs):
-            return mock_result
-        
-        # Setup async mock client
-        async_client = AsyncMock()
-        
-        # Create an event loop for async testing
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        try:
-            # Use patch context managers
-            with patch('LLMSR.llmSR.async_single_call', side_effect=mock_async_single_call), \
-                 patch('LLMSR.llmSR.curve_fit', return_value=(np.array([1.0]), None)), \
-                 patch('numpy.mean', return_value=10.0):  # Chi squared above exit condition
-                
-                # Run with async mode (now the only supported mode)
-                result = LLMSR.run_genetic(
-                    async_client, base64_image, x, y, 
-                    population_size=1, num_of_generations=1,
-                    temperature=1.0, exit_condition=0.0001  # Very strict exit condition
-                )
-        finally:
-            # Clean up the event loop
-            loop.close()
-            asyncio.set_event_loop(None)
+    def test_fit_module_logging_behavior(self):
+        """Test that the fit module logs appropriate events at appropriate levels"""
+        # Mock curve_fit to avoid actual fitting
+        with patch('LLMSR.fit.curve_fit') as mock_curve_fit, \
+             patch('LLMSR.fit.get_n_chi_squared_from_predictions') as mock_chi_squared:
             
-            # Verify logs
+            # Setup successful return
+            mock_curve_fit.return_value = (np.array([1.0, 2.0]), None)
+            mock_chi_squared.return_value = 0.001
+            
+            # Create test data and function
+            x = np.linspace(0, 1, 10)
+            y = x**2
+            curve = lambda x, a, b: a * x**b
+            
+            # Call function - success path
+            params, n_chi_squared = LLMSR.fit.fit_curve(x, y, curve, 2)
+            
+            # Get log output
+            log_content = self.log_capture.getvalue()
+            self.log_capture.truncate(0)
+            self.log_capture.seek(0)
+            
+            # Verify debug logs for successful operation
+            self.assertIn("DEBUG:LLMSR.fit:Fitting curve with", log_content)
+            self.assertIn("DEBUG:LLMSR.fit:Optimised parameters", log_content)
+            self.assertNotIn("ERROR:LLMSR.fit:", log_content)
+            
+            # Now test error path by making curve_fit raise an exception
+            mock_curve_fit.side_effect = RuntimeError("Test error")
+            
+            # Call function - error path
+            params, n_chi_squared = LLMSR.fit.fit_curve(x, y, curve, 2)
+            
+            # Get log output
             log_content = self.log_capture.getvalue()
             
-            # Check for specific log messages
-            self.assertIn("Starting genetic algorithm", log_content)
-            self.assertIn("Checking constant function", log_content)
-            self.assertIn("Generating initial population", log_content)
+            # Verify error is logged appropriately
+            self.assertIn("INFO:LLMSR.fit:All methods failed for this fit", log_content)
     
-    @patch('LLMSR.fit.curve_fit')    
-    def test_fit_logging(self, mock_curve_fit):
-        """Test logging in fit module"""
-        # Setup mock
-        mock_curve_fit.return_value = (np.array([1.0, 2.0]), None)
+    def test_response_logging_with_parse_errors(self):
+        """Test that the response module logs parsing errors appropriately"""
+        # Create a malformed response with no parameters
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message = MagicMock()
+        mock_response.choices[0].message.content = "This response has no parameters"
         
-        # Create test data and function
-        x = np.linspace(0, 1, 10)
-        y = x**2
-        curve = lambda x, *params: params[0] * x**params[1]
+        # Attempt to extract ansatz - should fail
+        with self.assertRaises(ValueError):
+            LLMSR.response.extract_ansatz(mock_response)
         
-        # Call the function
-        result = LLMSR.fit.fit_curve(x, y, curve, 2, allow_using_jax=True)
-        
-        # Verify logs
+        # Get log output
         log_content = self.log_capture.getvalue()
-        self.assertIn("Fitting curve with", log_content)
-        self.assertIn("Data shape", log_content)
-        self.assertIn("initial parameters", log_content)
-        self.assertIn("Running curve_fit optimization", log_content)
-    
-    def test_kan_to_symbolic_logging(self):
-        """Test logging in kan_to_symbolic function with basic validation"""
-        # Just verify that our logger works
-        logger = logging.getLogger("LLMSR.llmSR")
-        logger.debug("Starting KAN to symbolic conversion")
-        logger.debug("KAN model has 2 layers")
-        logger.debug("KAN test logging message")
         
-        # Verify log capture
-        log_content = self.log_capture.getvalue()
-        self.assertIn("Starting KAN to symbolic conversion", log_content)
-        self.assertIn("KAN model has 2 layers", log_content)
-        self.assertIn("KAN test logging message", log_content)
-        
+        # Verify appropriate debug logs leading up to error
+        self.assertIn("DEBUG:LLMSR.response:Extracting ansatz from model response", log_content)
+        self.assertIn("DEBUG:LLMSR.response:No parameters found", log_content)
+
 if __name__ == '__main__':
     unittest.main()

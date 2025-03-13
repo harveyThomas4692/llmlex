@@ -60,7 +60,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         kansr = KANSR(client=self.mock_client, model=self.mock_kan)
         
         # Prepare the node tree structure that would normally come from build_expression_tree
-        kansr.node_tree = {
+        kansr.expression_tree = {
             "edge_dict": {(0, 0, 0): "1.8*x + 3.2"},
             "top_k_edge_dicts": {(0, 0, 0): [{"expression": "1.8*x**2 + 3.2"}]},
             "node_tree": {(0, 0): "1.8*x0**2 + 3.2"},
@@ -68,7 +68,13 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         }
         
         # Mock the LLM simplification to return a response close to the true function
-        with patch.object(kansr, '_call_model_simplify', return_value=["2.0*x0**2 + 3.0"]):
+        with patch.object(kansr, '_call_model_simplify', return_value=["2.0*x0**2 + 3.0"]), \
+             patch.object(kansr, '_process_expression_using_llm', return_value=({
+                'expression': "2.0*x0**2 + 3.0",
+                'expression_numpy': "2.0*x0**2 + 3.0", 
+                'n_chi_squared': 0.01,
+                'fit_type': 'LLMsimplified'
+             }, [])):
             # Create mock dataset
             mock_dataset = {
                 'train_input': torch.tensor(x_data.reshape(-1, 1)),
@@ -78,7 +84,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
             }
             kansr.dataset = mock_dataset
             
-            # Call the optimize_expressions method with our test data
+            # Call the optimise_expressions method with our test data
             with patch('matplotlib.pyplot.subplots', return_value=(MagicMock(), MagicMock())), \
                  patch('matplotlib.pyplot.show'), \
                  patch('LLMSR.kansr.get_n_chi_squared') as mock_chi_squared, \
@@ -87,13 +93,13 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
                 # Mock the chi-squared calculation to return realistic values
                 mock_chi_squared.return_value = 0.05
                 
-                # Mock the curve fitting to return optimized parameters close to true values
+                # Mock the curve fitting to return optimised parameters close to true values
                 mock_fit.return_value = ([2.0, 3.0], 0.01)
                 
-                # Run the optimization
-                best_expressions, best_n_chi_squared, result_dicts = kansr.optimize_expressions(
+                # Run the optimisation
+                best_expressions, best_n_chi_squared, result_dicts, all_results_sorted = kansr.optimise_expressions(
                     client=self.mock_client,
-                    gpt_model="openai/gpt-4o",
+                    simplification_gpt_model="openai/gpt-4o-mini",
                     x_data=x_data,
                     y_data=y_data
                 )
@@ -102,6 +108,18 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
                 self.assertIsInstance(best_expressions, list)
                 self.assertIsInstance(best_n_chi_squared, list)
                 self.assertIsInstance(result_dicts, list)
+                self.assertIsInstance(all_results_sorted, list)
+                
+                # Verify all_results_sorted structure
+                self.assertGreaterEqual(len(all_results_sorted), 1)
+                output_results = all_results_sorted[0]
+                self.assertIsInstance(output_results, list)
+                # There should be at least one result per output
+                if output_results:
+                    result = output_results[0]
+                    self.assertIn('expression', result)
+                    self.assertIn('n_chi_squared', result)
+                    self.assertIn('fit_type', result)
                 
                 # Get the result dictionary for examination
                 result_dict = result_dicts[0]
@@ -109,7 +127,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
                 # Check that all expected keys are present
                 expected_keys = [
                     'raw_expression', 'raw_n_chi_squared', 
-                    'final_KAN_expression', 'n_chi_squared_KAN_final',
+                    'final_refitted_expression', 'n_chi_squared_refitted',
                     'final_LLM_expression', 'n_chi_squared_LLM_final',
                     'best_expression', 'best_n_chi_squared',
                     'best_fit_type'
@@ -135,7 +153,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         kansr = KANSR(client=self.mock_client, model=self.mock_kan)
         
         # Create a node tree that would simulate what we'd get from build_expression_tree
-        kansr.node_tree = {
+        kansr.expression_tree = {
             "edge_dict": {(0, 0, 0): "1.9*x + 0.8"},
             "top_k_edge_dicts": {(0, 0, 0): [{"expression": "1.9*x + 0.8"}]},
             "node_tree": {(0, 0): "1.9*x0 + 0.8"},
@@ -143,7 +161,13 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         }
         
         # Mock the LLM response to return a better expression
-        with patch.object(kansr, '_call_model_simplify', return_value=["2.0*x0 + 1.0"]):
+        with patch.object(kansr, '_call_model_simplify', return_value=["2.0*x0 + 1.0"]), \
+             patch.object(kansr, '_process_expression_using_llm', return_value=({
+                'expression': "2.0*x0 + 1.0",
+                'expression_numpy': "2.0*x0 + 1.0", 
+                'n_chi_squared': 0.01,
+                'fit_type': 'LLMsimplified'
+             }, [])):
             # Create mock dataset
             mock_dataset = {
                 'train_input': torch.tensor(x_data.reshape(-1, 1)),
@@ -153,7 +177,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
             }
             kansr.dataset = mock_dataset
             
-            # Call optimize_expressions with our test data
+            # Call optimise_expressions with our test data
             with patch('matplotlib.pyplot.subplots', return_value=(MagicMock(), MagicMock())), \
                  patch('matplotlib.pyplot.show'), \
                  patch('LLMSR.kansr.get_n_chi_squared') as mock_chi_squared, \
@@ -163,10 +187,10 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
                 mock_chi_squared.return_value = 0.05
                 mock_fit.return_value = ([2.0, 1.0], 0.01)
                 
-                # Run the optimization
-                best_expressions, best_n_chi_squared, result_dicts = kansr.optimize_expressions(
+                # Run the optimisation
+                best_expressions, best_n_chi_squared, result_dicts, all_results_sorted = kansr.optimise_expressions(
                     client=self.mock_client,
-                    gpt_model="openai/gpt-4o",
+                    simplification_gpt_model="openai/gpt-4o-mini",
                     x_data=x_data,
                     y_data=y_data
                 )
@@ -180,6 +204,10 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
                 self.assertGreater(len(result_dicts), 0)
                 self.assertIn('best_expression', result_dicts[0])
                 self.assertIn('best_n_chi_squared', result_dicts[0])
+                
+                # Verify the all_results_sorted structure
+                self.assertIsInstance(all_results_sorted, list)
+                self.assertGreater(len(all_results_sorted), 0)
                 
     def test_sinusoidal_fitting(self):
         """Test fitting a sinusoidal function."""
@@ -195,7 +223,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         kansr = KANSR(client=self.mock_client, model=self.mock_kan)
         
         # Create node tree
-        kansr.node_tree = {
+        kansr.expression_tree = {
             "edge_dict": {(0, 0, 0): "3.2*sin(1.8*x) + 0.4*x**2"},
             "top_k_edge_dicts": {(0, 0, 0): [{"expression": "3.2*sin(1.8*x) + 0.4*x**2"}]},
             "node_tree": {(0, 0): "3.2*sin(1.8*x0) + 0.4*x0**2"},
@@ -203,7 +231,13 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         }
         
         # Mock LLM response
-        with patch.object(kansr, '_call_model_simplify', return_value=["3.0*sin(2.0*x0) + 0.5*x0**2"]):
+        with patch.object(kansr, '_call_model_simplify', return_value=["3.0*sin(2.0*x0) + 0.5*x0**2"]), \
+             patch.object(kansr, '_process_expression_using_llm', return_value=({
+                'expression': "3.0*sin(2.0*x0) + 0.5*x0**2",
+                'expression_numpy': "3.0*np.sin(2.0*x0) + 0.5*x0**2", 
+                'n_chi_squared': 0.05,
+                'fit_type': 'LLMsimplified'
+             }, [])):
             # Create mock dataset
             mock_dataset = {
                 'train_input': torch.tensor(x_data.reshape(-1, 1)),
@@ -213,7 +247,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
             }
             kansr.dataset = mock_dataset
             
-            # Call optimize_expressions
+            # Call optimise_expressions
             with patch('matplotlib.pyplot.subplots', return_value=(MagicMock(), MagicMock())), \
                  patch('matplotlib.pyplot.show'), \
                  patch('LLMSR.kansr.get_n_chi_squared') as mock_chi_squared, \
@@ -223,10 +257,10 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
                 mock_chi_squared.return_value = 0.1  # Might be higher due to complexity
                 mock_fit.return_value = ([3.0, 2.0, 0.5], 0.05)
                 
-                # Run the optimization
-                best_expressions, best_n_chi_squared, result_dicts = kansr.optimize_expressions(
+                # Run the optimisation
+                best_expressions, best_n_chi_squared, result_dicts, all_results_sorted = kansr.optimise_expressions(
                     client=self.mock_client,
-                    gpt_model="openai/gpt-4o",
+                    simplification_gpt_model="openai/gpt-4o-mini",
                     x_data=x_data,
                     y_data=y_data
                 )
@@ -234,6 +268,13 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
                 # For sinusoidal functions, the n_chi-squared might be higher but still reasonable
                 self.assertLess(best_n_chi_squared[0], 2.0, 
                               "n_chi-squared value should be reasonable for a complex function")
+                
+                # Verify the all_results_sorted structure
+                self.assertIsInstance(all_results_sorted, list)
+                self.assertEqual(len(all_results_sorted), 1)  # One element per output
+                if all_results_sorted[0]:
+                    self.assertIn('n_chi_squared', all_results_sorted[0][0])
+                    self.assertIn('fit_type', all_results_sorted[0][0])
     
     def test_plot_results_mathematical_accuracy(self):
         """Test that plot_results correctly evaluates mathematical expressions."""
@@ -241,10 +282,10 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         result_dict = {
             'raw_expression': "2.0*x0**2 + 3.0",
             'raw_n_chi_squared': 0.01,
-            'final_KAN_expression': ["2.0*x0**2 + 3.0"],
-            'n_chi_squared_KAN_final': [0.01],
-            'final_LLM_expression': ["2.0*x0**2 + 3.0"],
-            'n_chi_squared_LLM_final': [0.01],
+            'final_refitted_expression': "2.0*x0**2 + 3.0",
+            'n_chi_squared_refitted': 0.01,
+            'final_LLM_expression': "2.0*x0**2 + 3.0",
+            'n_chi_squared_LLM_final': 0.01,
             'best_expression': "2.0*x0**2 + 3.0",
             'best_n_chi_squared': 0.01,
             'best_fit_type': 'raw'
@@ -275,7 +316,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
             
             # We want to capture the real evaluation, so only mock the plot functions
             # and not the eval calls
-            fig, ax = kansr.plot_results()
+            fig, ax = kansr.plot_results([-5,5],result_dict)
             
             # Verify the plot was created
             self.assertEqual(fig, mock_fig)

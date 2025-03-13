@@ -166,8 +166,10 @@ def check_key_limit(client):
     
     try:
         # Send request to check key limit
-        logger.debug(f"Sending request to {client.base_url}/auth/key")
-        response = requests.get(f"{client.base_url}/auth/key", headers=headers, timeout=30)
+        base_url = str(client.base_url).rstrip('/')
+        url_for_key_limit = f"{base_url}/auth/key"
+        logger.debug(f"Sending request to {url_for_key_limit}")
+        response = requests.get(url_for_key_limit, headers=headers, timeout=30)
         
         if response.status_code == 200:
             # Extract and return limit data
@@ -176,8 +178,8 @@ def check_key_limit(client):
             return limit_remaining
         else:
             # Log error and return response text
-            logger.error(f"API key check failed with status code {response.status_code}")
-            print(f"Request failed with status code {response.status_code}")
+            logger.error(f"API key check failed with status code {response.status_code}, sent request to {url_for_key_limit} ")
+            print(f"Request failed with status code {response.status_code}, sent request to {url_for_key_limit}")
             return response.text
             
     except Exception as e:
@@ -202,8 +204,10 @@ def check_key_usage(client):
     
     try:
         # Send request to check key usage
-        logger.debug(f"Sending request to {client.base_url}/auth/key")
-        response = requests.get(f"{client.base_url}/auth/key", headers=headers, timeout=30)
+        # Ensure no duplicate slashes between base_url and endpoint
+        base_url = str(client.base_url).rstrip('/')
+        url_for_key_usage = f"{base_url}/auth/key"
+        response = requests.get(url_for_key_usage, headers=headers, timeout=30)
         
         if response.status_code == 200:
             # Extract and return spend data
@@ -212,8 +216,8 @@ def check_key_usage(client):
             return current_usage
         else:
             # Log error and return response text
-            logger.error(f"API key usage check failed with status code {response.status_code}")
-            print(f"Request failed with status code {response.status_code}")
+            logger.error(f"API key usage check failed with status code {response.status_code}, sent request to {url_for_key_usage}")
+            print(f"Request failed with status code {response.status_code}, sent request to {url_for_key_usage}")
             return response.text
             
     except Exception as e:
@@ -475,7 +479,7 @@ async def async_call_model(client, model, image, prompt, system_prompt=None):
                 try:
                     # Check if credits have been added
                     logger.info("Checking if credits have been added...")
-                    if check_credits_remaining(client) > 1 or check_credits_remaining(client) == "unlimited":
+                    if check_credits_remaining(client) > 1.0 or check_credits_remaining(client) == "unlimited":
                         logger.info("Credits added. Resuming execution.")
                         return await async_call_model(client, model, image, prompt, system_prompt)
                 except Exception as credit_check_error:

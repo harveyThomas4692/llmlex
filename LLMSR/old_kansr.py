@@ -193,7 +193,7 @@ class KANSR:
                 self.logger.info(f"Refitting after simplifying gave a chi^2 of {n_chi_squared:.4e}")
             except RuntimeError as e:
                 self.logger.error(e)
-                self.logger.info("Proceeding with unoptimized parameters")
+                self.logger.info("Proceeding with unoptimised parameters")
                 params_opt = params_initial
         
             # prune and simplify refitted model

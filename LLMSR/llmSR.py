@@ -529,7 +529,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
             system_prompt (str, optional): The system prompt to use for the API calls. Default is None.
             elite (bool, optional): Whether to use elitism in the genetic algorithm. Default is False.
             use_async (bool, optional): Whether to use async calls for population generation. Default is True.
-            plot_parents (bool, optional): Whether to plot the parents in the genetic algorithm, showing the model the shape of the optimize parents. Default is False.
+            plot_parents (bool, optional): Whether to plot the parents in the genetic algorithm, showing the model the shape of the optimise parents. Default is False.
             demonstrate_parent_plotting (bool, optional): Whether to show to the user an example of the parent plotting. Default is False.
             constant_on_failure (bool, optional): Whether to return the constant function if the genetic algorithm fails. Default is False.
         Returns:
@@ -552,7 +552,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     
     logger.debug("Checking constant function as baseline")
     curve = lambda x, *params: params[0] * np.ones(len(x))
-    params, _ = curve_fit(curve, x, y, p0=[1])
+    params, _ = curve_fit(curve, x, y, p0=[1.0])
     n_chi_squared = get_n_chi_squared(x, y, curve, params)
 
     if n_chi_squared <= exit_condition:
@@ -673,7 +673,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         return populations
 
     if plot_parents and demonstrate_parent_plotting:
-        demo_func_list = [(pop['ansatz'], pop['params']) for pop in populations[-1][0:min(2, len(populations[-1]))]]
+        demo_func_list = [(pop['ansatz'], pop['params']) for pop in populations[-1][-min(2, len(populations[-1])):]] # take the last two, so the best fit
         demo_image = generate_base64_image_with_parents(x, y, demo_func_list, fig=None, ax=None, actually_plot=True, title_override="Example of a plot with parents added")
     # Evolution loop
     for generation in range(num_of_generations-1):
@@ -712,7 +712,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
             population.append(best_pop)
             
         if use_async:
-            logger.info(f"Generation {generation+1}/{num_of_generations-1}: Generating {population_size} new individuals. Async? {use_async}, elitism? {elite}")
+            logger.info(f"Generation {generation+1}/{num_of_generations-1}: Generating {population_size} new individuals. Elitism? {elite}")
             
             async def generate_generation_population():
                 tasks = []
@@ -759,7 +759,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                 population = gen_population
         
         else:
-            logger.info(f"Generation {generation+1}/{num_of_generations-1}: Generated {population_size} individuals. Async? {use_async}, elitism? {elite}")
+            logger.info(f"Generation {generation+1}/{num_of_generations-1}: Generated {population_size} individuals. Elitism? {elite}")
             # Original synchronous implementation
             for funcs in tqdm(range(population_size - (1 if elite else 0))):
                 good = False
@@ -816,7 +816,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
             
             # Print validation issue summary if any issues detected
             if api_stats.total_validation_issues() > 0:
-                logger.info(f"Validation issues detected during genetic algorithm run")
+                logger.info(f"Validation issues detected during genetic algorithm run, see summary.")
             
             return populations
     
@@ -827,7 +827,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     
     # Print validation issue summary if any issues detected
     if api_stats.total_validation_issues() > 0:
-        logger.info(f"Validation issues detected during genetic algorithm run")
+        logger.info(f"Validation issues detected during genetic algorithm run, see summary.")
     
     return populations
 
@@ -1022,7 +1022,8 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                 logger.info(f"  - {warning_type.replace('_', ' ')}: {count}")
                 
     end_usage = check_key_usage(client)
-    logger.info(f"API key usage whilst this was running: ${end_usage - start_usage:.2f}")
+    cost = f"${(end_usage - start_usage):.2f}" if isinstance(end_usage, (float, int)) and isinstance(start_usage, (float, int)) else 'unknown'
+    logger.info(f"API key usage whilst this kan_to_symbolic was running: {cost}")
     
     return res_fcts
 
@@ -1033,11 +1034,13 @@ def generate_learned_f(sym_expr):
     
     Args:
         sym_expr: Dictionary mapping connection tuples (layer, input_node, output_node) 
-                 to the results of the genetic algorithm for that connection.
+                 to the results of the genetic algorithm for that connection, or mapping to a
+                 flattened and sorted list of results (as in the output of KANSR._sort_symbolic_expressions).
                  
     Returns:
         Tuple containing:
         - The generated Python function that implements the learned model
+        - Total number of parameters in the learned model
         - List of best parameters for all connections
         
     Raises:
@@ -1068,14 +1071,20 @@ def generate_learned_f(sym_expr):
     for (l, i, j) in conn_keys:
         if sym_expr[(l, i, j)] is None:
             continue
-        best = max((item for sub in sym_expr[(l, i, j)] for item in sub), key=lambda item: item['score'])
+        if isinstance(sym_expr[(l, i, j)], list) and all(isinstance(sub, list) for sub in sym_expr[(l, i, j)]):
+            best = max((item for sub in sym_expr[(l, i, j)] for item in sub), key=lambda item: item['score'])
+        else:
+            best = max(sym_expr[(l, i, j)], key=lambda item: item['score'])
         param_counts[(l, i, j)] = len(best['params'])
     
     # Second pass: build connections with proper parameter indexing
     for (l, i, j) in conn_keys:
         if sym_expr[(l, i, j)] is None:
             continue
-        best = max((item for sub in sym_expr[(l, i, j)] for item in sub), key=lambda item: item['score'])
+        if isinstance(sym_expr[(l, i, j)], list) and all(isinstance(sub, list) for sub in sym_expr[(l, i, j)]):
+            best = max((item for sub in sym_expr[(l, i, j)] for item in sub), key=lambda item: item['score'])
+        else:
+            best = max(sym_expr[(l, i, j)], key=lambda item: item['score'])
         ansatz = best['ansatz'].strip()
         
         # Collect best parameters
@@ -1091,15 +1100,17 @@ def generate_learned_f(sym_expr):
         
         # Replace params references with properly indexed params
         for p_idx, orig_idx in enumerate(range(len(best['params']))):
-            ansatz_mod = ansatz_mod.replace(f"params[{orig_idx}]", f"params[{param_indices[p_idx]}]")
+            ansatz_mod = ansatz_mod.replace(f"params[{orig_idx}]", f"paramsp[{param_indices[p_idx]}]")
+
+        #stop overlapping replacements
+        ansatz_mod = ansatz_mod.replace("paramsp", "params")
         
         conns.setdefault(l, {}).setdefault(j, []).append((i, ansatz_mod))
-    
     lines = []
     lines.append("def learned_f(X, *params):")
     lines.append("    # Layer 0 activations")
     inp = ", ".join([f"x_0_{i}" for i in input_nodes])
-    lines.append(f"    {inp} = X")
+    lines.append(f"    {inp} = " + ", ".join([f"X[..., {i}]" for i in input_nodes]))
     # Compute activations layer by layer
     for l in sorted(conns.keys()):
         for j in sorted(conns[l].keys()):
@@ -1119,8 +1130,11 @@ def generate_learned_f(sym_expr):
         ret = ", ".join([f"x_{final_layer}_{j}" for j in final_nodes])
         lines.append(f"    return {ret}")
     
-    total_params = param_index
-    return "\n".join(lines), total_params, np.array(best_params)
+    total_num_params = param_index
+    return "\n".join(lines), total_num_params, np.array(best_params)
+
+
+
 
                 
 def validate_function_output(x, f, params, stats):
