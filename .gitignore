@@ -54,3 +54,4 @@ LLMSR/.ipynb_checkpoints/llmSR-checkpoint.py
 /LLMSR/.ipynb_checkpoints
 /LLMSR/__pycache__
 /model
+.DS_Store
