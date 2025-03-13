@@ -141,29 +141,16 @@ results = LLMSR.kan_sr.run_complete_pipeline(
 
 ## Running Tests
 
-To run tests, use the following command: 
+To run tests, use the following command, which has a nice summary:
+
+```
+python tests/run_tests.py 
+``` 
+For the full gory details, use the following command:
+
 ```bash
 python -m unittest discover -s tests
 ```
 
-For tests with the OpenRouter API (costs money, but typically less than one cent per test):
-
-1. Create a `.env` file with your API key or set the environment variable:
-   ```bash
-   OPENROUTER_API_KEY=your_actual_api_key
-   ```
-
-2. Enable real API tests:
-   ```bash
-   export LLMSR_TEST_REAL_API=1
-   ```
-
-3. Run tests:
-   ```bash
-   python -m unittest discover tests
-   ```
-
-Alternatively, use the test script:
-```bash
-python tests/run_real_api_tests.py
-```
+For tests with the OpenRouter API (costs money, but typically less than one cent per test) - you will need to create a `.env` file with your API key or set the environment variable: `OPENROUTER_API_KEY=your_actual_api_key`
+To disable the API tests, run `run_tests.py` with the `--no-api` flag.
