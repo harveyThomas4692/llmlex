@@ -1,7 +1,7 @@
 # LLM_SR
 LLM_SR is a Python library for symbolic regression using vision-capable Large Language Models. It finds mathematical formulae to fit your data by visualizing them as graphs and using LLMs to suggest equations. I recommend using the `uv` package manager to install the package - it's so much faster than pip!
 
-Our custom scoring function is a robust, scale-invariant "normalized chi-squared" that handles both large and small values gracefully:
+Our custom scoring function is a robust, approximately scale-invariant "normalized chi-squared" that handles both large and small values gracefully. Note that it isn't exactly scale invariance, because we actually (do/may) not want complete scale invariance. If the mean and MAD are close to zero, the score normalises by a small epsilon instead. This is so that functions that are approximately zero can be well-modelled by a fit which is simply zero.
 
 $$n\_\chi^2 = \frac{1}{N}\sum_{i=1}^{N}\frac{(y_i - \hat{y}_i)^2}{\max(\text{global\\_scale}, \alpha |y_i|)^2}$$
 
