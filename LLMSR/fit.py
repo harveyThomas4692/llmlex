@@ -141,21 +141,21 @@ def _get_n_chi_squared_from_predictions_jax(x, y, predictions, alpha=0.01, eps_s
     # Residuals
     residuals = y - predictions
 
-    # A simple, robust scale measure: median absolute deviation
+    # A simple scale measure: median absolute deviation
     median_y = jnp.median(y)
     mad_y = jnp.median(jnp.abs(y - median_y))
 
     # Mean of absolute y (for additional scale-based floor)
     mean_abs_y = jnp.mean(jnp.abs(y))
 
-    # Define a robust overall scale, ensuring it never collapses to zero
+    # Define a robust global scale, ensuring it never collapses to zero
     # (ties scale to MAD and a fraction of the mean magnitude)
     global_scale = jnp.maximum(mad_y, alpha * mean_abs_y)
     global_scale = jnp.maximum(global_scale, eps_scale)
 
     # For each data point, define a local denominator to smoothly handle
     # relative vs. absolute error. This prevents blow-up near zero.
-    # delta_i = max(robust_scale, alpha * |y_i|)
+    # delta_i = max(global_scale, alpha * |y_i|)
     abs_y = jnp.abs(y)
     local_scale = jnp.maximum(global_scale, alpha * abs_y)
 
@@ -164,6 +164,15 @@ def _get_n_chi_squared_from_predictions_jax(x, y, predictions, alpha=0.01, eps_s
     n_chi_squared = jnp.mean((residuals ** 2) / (local_scale ** 2))
 
     return n_chi_squared 
+
+#### NOT USED AT THE MOMENT
+def _get_chi_squared_from_predictions_jax_THOMASSORIGINAL(x, y, predictions, eps_scale=1e-6):
+    """Internal function for chi-squared calculation using JAX, for Thomas's original code."""
+    # Residuals
+    residuals = y - predictions
+    chi_squared = jnp.mean(residuals**2 / (y**2 + eps_scale))
+
+    return chi_squared 
 
 def get_n_chi_squared_from_predictions(x, y, predictions, alpha=0.01, eps_scale=1e-4):
     """
