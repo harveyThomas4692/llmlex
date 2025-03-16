@@ -652,7 +652,8 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
         finite_scores = [ind['score'] for ind in population if np.isfinite(ind['score'])]
         if finite_scores:
             min_score = min(finite_scores)
-            bad_score = min_score - 1e2  # Fixed penalty
+            # Set bad score to twice the worst score (assuming scores are negative)
+            bad_score = 2 * min_score if min_score < 0 else min_score - abs(min_score)
         else:
             bad_score = -1e8  # Fallback if no finite scores
             
