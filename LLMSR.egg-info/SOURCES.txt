@@ -2,8 +2,12 @@ setup.py
 LLMSR/__init__.py
 LLMSR/fit.py
 LLMSR/images.py
+LLMSR/kansr.py
 LLMSR/llm.py
 LLMSR/llmSR.py
+LLMSR/old_2_kan_sr.py
+LLMSR/old_kan_sr.py
+LLMSR/old_kansr.py
 LLMSR/response.py
 LLMSR.egg-info/PKG-INFO
 LLMSR.egg-info/SOURCES.txt
@@ -11,10 +15,14 @@ LLMSR.egg-info/dependency_links.txt
 LLMSR.egg-info/requires.txt
 LLMSR.egg-info/top_level.txt
 tests/__init__.py
+tests/conftest.py
 tests/run_real_api_tests.py
 tests/run_tests.py
 tests/test_fit.py
+tests/test_fit_optimizers.py
 tests/test_images.py
+tests/test_kansr.py
+tests/test_kansr_math.py
 tests/test_llm.py
 tests/test_llmSR.py
 tests/test_logging.py
