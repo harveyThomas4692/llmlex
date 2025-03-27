@@ -12,8 +12,8 @@ import tempfile
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-import LLMSR
-from LLMSR.llmSR import single_call, run_genetic, async_single_call
+import LLM_LEx
+from LLM_LEx.LLMLEx import single_call, run_genetic, async_single_call
 
 # Optional imports for real API tests
 try:
@@ -36,7 +36,7 @@ class TestLLMSR(unittest.TestCase):
         ax.plot(self.x, self.y)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
-        self.base64_image = LLMSR.images.generate_base64_image(fig, ax, self.x, self.y)
+        self.base64_image = LLM_LEx.images.generate_base64_image(fig, ax, self.x, self.y)
         plt.close(fig)
         
         # Create a mock client
@@ -244,7 +244,7 @@ This function captures both the oscillation and decay visible in the data."""
         
         # Check initial usage
         try:
-            initial_usage = LLMSR.llm.check_key_limit(client)
+            initial_usage = LLM_LEx.llm.check_key_limit(client)
         except Exception:
             # Skip if we can't check usage
             self.skipTest("Could not check API key limit - skipping real API test")
@@ -258,7 +258,7 @@ This function captures both the oscillation and decay visible in the data."""
         ax.scatter(x, y)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
-        base64_image = LLMSR.images.generate_base64_image(fig, ax, x, y)
+        base64_image = LLM_LEx.images.generate_base64_image(fig, ax, x, y)
         plt.close(fig)
         
         # Run test with real API call
@@ -288,7 +288,7 @@ This function captures both the oscillation and decay visible in the data."""
             
             # Check final usage for reporting
             try:
-                final_usage = LLMSR.llm.check_key_limit(client)
+                final_usage = LLM_LEx.llm.check_key_limit(client)
                 print(f"API test cost: ${np.round(final_usage - initial_usage, 3)}")
             except Exception:
                 pass

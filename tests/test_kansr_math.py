@@ -15,7 +15,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 # Import the modules to test
-from LLMSR.kansr import KANSR
+from LLM_LEx.kanLEx import KANSR
 
 
 class TestKANSRMathematicalCorrectness(unittest.TestCase):

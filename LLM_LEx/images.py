@@ -3,13 +3,13 @@ import io
 import matplotlib.pyplot as plt
 import logging
 import os
-from LLMSR.response import fun_convert
+from LLM_LEx.response import fun_convert
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 # Get module logger
-logger = logging.getLogger("LLMSR.images")
+logger = logging.getLogger("LLMLEx.images")
 
 def encode_image(image_path):
     '''

@@ -2,7 +2,7 @@ import logging
 import os
 
 # Configure logging
-logger = logging.getLogger("LLMSR")
+logger = logging.getLogger("LLMLEx")
 logger.setLevel(logging.INFO)
 
 # Create console handler
@@ -17,11 +17,11 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # Allow log level to be set via environment variable
-log_level = os.environ.get('LLMSR_LOG_LEVEL', 'INFO').upper()
+log_level = os.environ.get('LLMLEx_LOG_LEVEL', 'INFO').upper()
 if log_level in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
     logger.setLevel(getattr(logging, log_level))
 
-from .llmSR import *
+from .LLMLEx import *
 from . import images
 from . import llm
 from . import fit

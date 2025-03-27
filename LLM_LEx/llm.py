@@ -7,7 +7,7 @@ import threading
 from functools import wraps
 
 # Get module logger
-logger = logging.getLogger("LLMSR.llm")
+logger = logging.getLogger("LLMLEx.llm")
 
 # Default API call rate limiter values
 DEFAULT_MAX_CALLS_PER_MINUTE = 120
@@ -20,12 +20,12 @@ _api_call_times = []  # Rolling window of call times
 _rate_limit_lock = None  # Will be initialized later as threading.Lock()
 
 # Get rate limit from environment or use default
-MAX_CALLS_PER_MINUTE = int(os.environ.get('LLMSR_MAX_CALLS_PER_MINUTE', DEFAULT_MAX_CALLS_PER_MINUTE))
+MAX_CALLS_PER_MINUTE = int(os.environ.get('LLMLEx_MAX_CALLS_PER_MINUTE', DEFAULT_MAX_CALLS_PER_MINUTE))
 
 # Check if we're in test mode
-if os.environ.get('LLMSR_TEST_REAL_API'):
+if os.environ.get('LLMLEx_TEST_REAL_API'):
     # Use more restrictive test rate limit
-    MAX_CALLS_PER_MINUTE = int(os.environ.get('LLMSR_TEST_MAX_CALLS_PER_MINUTE', DEFAULT_TEST_MAX_CALLS_PER_MINUTE))
+    MAX_CALLS_PER_MINUTE = int(os.environ.get('LLMLEx_TEST_MAX_CALLS_PER_MINUTE', DEFAULT_TEST_MAX_CALLS_PER_MINUTE))
     logger.info(f"Test mode detected - using restricted rate limit: {MAX_CALLS_PER_MINUTE} calls/min")
 
 # Minimum time between API calls in seconds
@@ -308,7 +308,7 @@ def call_model(client, model, image, prompt, system_prompt=None):
     if system_prompt is None:
         #system_prompt = ("Give an improved ansatz to the list for the image. Follow on from the users text with no explaining."
         #                 "Params can be any length. If there's some noise in the data, give preference to simpler functions"
-        # THIS IS THE SYSTEM PROMPT FOR THE SYNC MODEL - see LLMSR.py for the async version
+        # THIS IS THE SYSTEM PROMPT FOR THE SYNC MODEL - see LLMLEx.py for the async version
         system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz (formula template). "
                          "Respond with ONLY the ansatz formula, without any explanation or commentary. Ensure it is in valid python. You may use numpy functions. "
                          "params is a list of parameters that can be of any length or complexity. "

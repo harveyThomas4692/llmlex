@@ -14,7 +14,7 @@ warnings.warn(
 )
 
 # Import from new implementation for backward compatibility
-from LLMSR.kansr import KANSR, run_complete_pipeline
+from LLM_LEx.kanLEx import KANSR, run_complete_pipeline
 
 # Re-export all functions from the old module through the new implementation
 # This allows existing code to continue working while encouraging migration to the new API

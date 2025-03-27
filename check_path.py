@@ -14,7 +14,7 @@ for p in site.getsitepackages():
 
 # Try to find LLMSR
 try:
-    import LLMSR
-    print(f"\nLLMSR is installed at: {os.path.dirname(LLMSR.__file__)}")
+    import LLM_LEx
+    print(f"\nLLM_LEx is installed at: {os.path.dirname(LLM_LEx.__file__)}")
 except ImportError:
-    print("\nLLMSR could not be imported")
+    print("\nLLM_LEx could not be imported")

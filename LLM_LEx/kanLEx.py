@@ -21,9 +21,9 @@ import stopit
 import logging
 from kan import KAN, create_dataset
 
-import LLMSR.llmSR as llmSR
-from LLMSR.fit import get_n_chi_squared, fit_curve_with_guess, fit_curve_with_guess_jax, test_np_function_equivalence, get_n_chi_squared_from_predictions, test_data_equivalence
-import LLMSR.llm as llm
+import LLM_LEx.LLMLEx as LLMLEx
+from LLM_LEx.fit import get_n_chi_squared, fit_curve_with_guess, fit_curve_with_guess_jax, test_np_function_equivalence, get_n_chi_squared_from_predictions, test_data_equivalence
+import LLM_LEx.llm as llm
 import tqdm
 
 class KANSR:
@@ -51,7 +51,7 @@ class KANSR:
             model: Pre-existing KAN model (optional, if provided width/grid/k are ignored)
         """
         # Set up logging
-        self.logger = logging.getLogger("LLMSR.kansr")
+        self.logger = logging.getLogger("LLMLEx.kansr")
         self.logger.setLevel(log_level)
         self.logger.propagate = False  # Prevent propagation to parent loggers
         
@@ -273,7 +273,7 @@ class KANSR:
             f"It's not the default as this is not necessarily meaningful for each individual activation function.")
 
         self.logger.info(f"Converting KAN model to symbolic expressions (exit_condition={exit_condition})")
-        result_of_kan_to_symbolic = llmSR.kan_to_symbolic(
+        result_of_kan_to_symbolic = LLMLEx.kan_to_symbolic(
             self.model, client_to_use, population=population, generations=generations,
             temperature=temperature, gpt_model=gpt_model, exit_condition=exit_condition,
             verbose=verbose, use_async=use_async, plot_fit=plot_fit, plot_parents=plot_parents,
@@ -1196,7 +1196,7 @@ class KANSR:
         self.logger.info("Argument x of learned function are arraylike, NOT x0, x1, etc.")
         if result_of_kan_to_symbolic is None:
             result_of_kan_to_symbolic = self.symbolic_expressions
-        learned_func_str, total_params, best_params =  llmSR.generate_learned_f(result_of_kan_to_symbolic)
+        learned_func_str, total_params, best_params =  LLMLEx.generate_learned_f(result_of_kan_to_symbolic)
         local_vars = {}
         exec(learned_func_str, {"np": np}, local_vars)
         python_generated_function = local_vars.get('learned_f')
@@ -1431,7 +1431,7 @@ class KANSR:
                     raw_n_chi_squared = result_dict['raw_n_chi_squared']
                     y_raw= self._convert_to_np_function(raw_expr, Ninputs, floats_only=True)(x)
                     self.logger.info('Plotting raw expression')
-                    ax.plot(x, y_raw, 'orange', dashes=[4, 2], label=f'Raw expression from LLMSR (χ²={raw_n_chi_squared:.5e})', linewidth=2)
+                    ax.plot(x, y_raw, 'orange', dashes=[4, 2], label=f'Raw expression from LLMLEx (χ²={raw_n_chi_squared:.5e})', linewidth=2)
                 if simplified_refitted_expr is not None:
                     n_chi_squared = result_dict['n_chi_squared_refitted']
                     y_simplified = self._convert_to_np_function(simplified_refitted_expr, Ninputs, floats_only=True)(x)

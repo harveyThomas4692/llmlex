@@ -3,7 +3,7 @@ import logging
 import io
 import sys
 import asyncio
-import LLMSR
+import LLM_LEx
 import numpy as np
 import matplotlib.pyplot as plt
 import tempfile
@@ -76,7 +76,7 @@ class TestLogging(unittest.TestCase):
         y = x**2
         
         # Call the function
-        result = LLMSR.images.generate_base64_image(fig, ax, x, y)
+        result = LLM_LEx.images.generate_base64_image(fig, ax, x, y)
         plt.close(fig)
         
         # Get log output
@@ -97,7 +97,7 @@ class TestLogging(unittest.TestCase):
             
         # Attempt to encode a nonexistent image
         with self.assertRaises(FileNotFoundError):
-            LLMSR.images.encode_image(nonexistent_path)
+            LLM_LEx.images.encode_image(nonexistent_path)
             
         # Get log output
         log_content = self.log_capture.getvalue()
@@ -120,7 +120,7 @@ class TestLogging(unittest.TestCase):
         client.base_url = "https://example.com"
         
         # Call the function - success path
-        result = LLMSR.llm.check_key_limit(client)
+        result = LLM_LEx.llm.check_key_limit(client)
         
         # Clear the log capture
         log_content = self.log_capture.getvalue()
@@ -136,7 +136,7 @@ class TestLogging(unittest.TestCase):
         mock_get.return_value = mock_response
         
         # Call the function - error path
-        result = LLMSR.llm.check_key_limit(client)
+        result = LLM_LEx.llm.check_key_limit(client)
         
         # Get new log content
         log_content = self.log_capture.getvalue()
@@ -160,7 +160,7 @@ class TestLogging(unittest.TestCase):
             curve = lambda x, a, b: a * x**b
             
             # Call function - success path
-            params, n_chi_squared = LLMSR.fit.fit_curve(x, y, curve, 2)
+            params, n_chi_squared = LLM_LEx.fit.fit_curve(x, y, curve, 2)
             
             # Get log output
             log_content = self.log_capture.getvalue()
@@ -176,7 +176,7 @@ class TestLogging(unittest.TestCase):
             mock_curve_fit.side_effect = RuntimeError("Test error")
             
             # Call function - error path
-            params, n_chi_squared = LLMSR.fit.fit_curve(x, y, curve, 2)
+            params, n_chi_squared = LLM_LEx.fit.fit_curve(x, y, curve, 2)
             
             # Get log output
             log_content = self.log_capture.getvalue()
@@ -194,7 +194,7 @@ class TestLogging(unittest.TestCase):
         
         # Attempt to extract ansatz - should fail
         with self.assertRaises(ValueError):
-            LLMSR.response.extract_ansatz(mock_response)
+            LLM_LEx.response.extract_ansatz(mock_response)
         
         # Get log output
         log_content = self.log_capture.getvalue()

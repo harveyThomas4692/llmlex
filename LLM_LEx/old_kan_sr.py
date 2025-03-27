@@ -19,10 +19,10 @@ from kan import KAN, create_dataset
 import sympy as sp
 from sympy import symbols, simplify
 import sympy as sp
-import LLMSR.llmSR as llmSR
+import LLM_LEx.LLMLEx as LLMLEx
 from sympy import sin, cos, exp, log, sqrt, sinh, cosh, tanh
 from sympy.printing.numpy import NumPyPrinter
-from LLMSR.fit import get_n_chi_squared, fit_curve_with_guess, fit_curve_with_guess_jax
+from LLM_LEx.fit import get_n_chi_squared, fit_curve_with_guess, fit_curve_with_guess_jax
 import stopit
 
 
@@ -772,7 +772,7 @@ def plot_results(f, ranges, result_dict, model = None, pruned_model = None, titl
         raw_expr = result_dict['raw_expression']
         y_raw = eval(convert_sympy_to_numpy(raw_expr), {"np": np, "x0": x})
         print('plotting raw expression')
-        ax.plot(x, y_raw, 'k--', dashes=[4, 2], label=f'Raw expression from LLMSR', linewidth=2)
+        ax.plot(x, y_raw, 'k--', dashes=[4, 2], label=f'Raw expression from LLM_LEx', linewidth=2)
 
 
         simplified_by_KAN_expr = result_dict['final_KAN_expression'][best_idx]
@@ -867,7 +867,7 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
         pruned_model.plot()
         train_loss = res['train_loss']
         # 4. Convert to symbolic expressions
-        res = llmSR.kan_to_symbolic(pruned_model, client, population=population, generations=generations, temperature=temperature, gpt_model=gpt_model,
+        res = LLMLEx.kan_to_symbolic(pruned_model, client, population=population, generations=generations, temperature=temperature, gpt_model=gpt_model,
                                     exit_condition=exit_condition if exit_condition is not None else min(train_loss).item(), verbose=verbose, use_async=use_async, plot_fit=plot_fit, plot_parents=plot_parents, demonstrate_parent_plotting=demonstrate_parent_plotting)
         symb_expr_sorted = sort_symb_expr(res)
         

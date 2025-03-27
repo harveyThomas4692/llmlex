@@ -4,7 +4,7 @@ from scipy import special
 import logging
 
 # Get module logger
-logger = logging.getLogger("LLMSR.response")
+logger = logging.getLogger("LLMLEx.response")
 
 def extract_ansatz(response):
     """

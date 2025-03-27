@@ -29,7 +29,7 @@ jax.config.update("jax_enable_x64", False)
 jax.config.update("jax_platform_name", "cpu")  # Disable JAX on GPU
 
 # Get module logger
-logger = logging.getLogger("LLMSR.fit")
+logger = logging.getLogger("LLMLEx.fit")
 
 
 #########################################

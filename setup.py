@@ -7,7 +7,7 @@ with open("requirements.txt", "r") as fh:
     REQUIREMENTS = fh.read().splitlines()
 
 setuptools.setup(
-    name="LLMSR",
+    name="LLM_LEx",
     version="0.0.1",
     author="Thomas R. Harvey",
     author_email="trharvey@mit.edu",

@@ -1,4 +1,4 @@
-import LLMSR
+import LLM_LEx
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -56,7 +56,7 @@ class KANSR:
     
     def kan_to_symbolic(self, population=10, generations=3, temperature=0.1, exit_condition=1e-3):
         """
-        Converts a given kan model symbolic representations using llmsr.
+        Converts a given kan model symbolic representations using llmlex.
         Parameters:
             population (int, optional): The population size for the genetic algorithm. Default is 10.
             generations (int, optional): The number of generations for the genetic algorithm. Default is 3.
@@ -88,7 +88,7 @@ class KANSR:
                         fig, ax = plt.subplots()
                         plt.xticks([x_min, x_max], ['%2.f' % x_min, '%2.f' % x_max])
                         plt.yticks([y_min, y_max], ['%2.f' % y_min, '%2.f' % y_max])
-                        base64_image = LLMSR.images.generate_base64_image(fig, ax, x, y)
+                        base64_image = LLM_LEx.images.generate_base64_image(fig, ax, x, y)
                         self.logger.info(f"Processing KAN connection {(l,i,j)}")
                         # suppress plot by writing to random buffer
                         buffer = io.BytesIO()
@@ -96,7 +96,7 @@ class KANSR:
                         plt.close(fig)
                         mask = self.model.act_fun[l].mask
                         try:
-                            res = LLMSR.run_genetic(self.llm_client, base64_image, x, y, population, generations, temperature=temperature, model=self.llm_model, system_prompt=None, elite=False, exit_condition=exit_condition, for_kan=True)
+                            res = LLM_LEx.run_genetic(self.llm_client, base64_image, x, y, population, generations, temperature=temperature, model=self.llm_model, system_prompt=None, elite=False, exit_condition=exit_condition, for_kan=True)
                             res_fcts[(l,i,j)] = res
                         except Exception as e:
                             self.logger.error(e)

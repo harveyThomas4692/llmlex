@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from LLMSR.llm import get_prompt, call_model, async_call_model
+from LLM_LEx.llm import get_prompt, call_model, async_call_model
 
 class TestLLM(unittest.TestCase):
     def test_get_prompt_default(self):

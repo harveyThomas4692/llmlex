@@ -19,8 +19,8 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 # Import the modules to test
-import LLMSR.llmSR
-from LLMSR.kansr import KANSR, run_complete_pipeline
+import LLM_LEx.LLMLEx
+from LLM_LEx.kanLEx import KANSR, run_complete_pipeline
 
 
 class TestKANSRClass(unittest.TestCase):
@@ -48,7 +48,7 @@ class TestKANSRClass(unittest.TestCase):
         self.patches = []
         
         # Save the original KAN class to restore it later if needed
-        self.original_KAN = LLMSR.kansr.KAN
+        self.original_KAN = LLM_LEx.kansr.KAN
         
         # Create the mock KAN object
         self.mock_kan = MagicMock()
@@ -163,7 +163,7 @@ class TestKANSRClass(unittest.TestCase):
         
         # Let's also create a separate instance specifically for the initialization test
         # Save current mock state
-        self.real_KAN = LLMSR.kansr.KAN
+        self.real_KAN = LLM_LEx.kansr.KAN
         
         # Setup things needed for tests
         self.kansr.dataset = self.mock_dataset
