@@ -80,8 +80,8 @@ model = KAN(width=[2,1,1,1], grid=7, k=3, seed=0, device=device)
 
 # Create dataset
 f = lambda x: torch.exp(torch.sin(torch.pi*x[:,[0]]) + x[:,[1]]**2) # should be a torch function
-#Initialize a KANSR instance for the multivariate function
-multivariate_kansr = KANSR(
+#Initialize a KAN_LEx instance for the multivariate function
+multivariate_kansr = KAN_LEx(
     client=client,
     width=[2,5,1 1],  # 2 inputs, 5 hidden nodes, 1 output
     grid=5,
@@ -113,14 +113,14 @@ best_expressions, best_chi_squareds, results_dicts, results_all_dicts = multivar
 )
 ```
 
-`KANSR.generate_learned_f_function` finds the symbolic expression expressed as a python program, but does not simplify the expression. For that, use `optimise_expression` in the KANSR class, or `run_complete_pipeline` for a complete end-to-end pipeline.
+`KAN_LEx.generate_learned_f_function` finds the symbolic expression expressed as a python program, but does not simplify the expression. For that, use `optimise_expression` in the KANSR class, or `run_complete_pipeline` for a complete end-to-end pipeline.
 
 For a complete end-to-end symbolic regression pipeline using KANs, use the `run_complete_pipeline` function, or see the example notebook `Examples/kan_sr_example.ipynb`.
 
 ```python
 # Complete KAN-SR Pipeline
 # Run the complete pipeline with custom parameters
-results = LLMSR.kan_sr.run_complete_pipeline(
+results = LLM_LEx.KAN_LEx.run_complete_pipeline(
     client, f,
     ranges=x_range,
     width=[1, 4, 1],  # Use a wider network for this more complex function
