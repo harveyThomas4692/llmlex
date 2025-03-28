@@ -26,7 +26,7 @@ from LLM_LEx.fit import get_n_chi_squared, fit_curve_with_guess, fit_curve_with_
 import LLM_LEx.llm as llm
 import tqdm
 
-class KANSR:
+class KAN_LEx:
     """
     A class for performing symbolic regression using Kolmogorov-Arnold Networks (KANs).
     
@@ -37,7 +37,7 @@ class KANSR:
     def __init__(self, client = None, width=None, grid=None, k=None, seed=17, symbolic_enabled=False, 
                  device='cpu', log_level=logging.INFO, model=None):
         """
-        Initialize a KANSR instance.
+        Initialize a KAN_LEx instance.
         
         Args:
             client: Client for LLM API calls
@@ -51,7 +51,7 @@ class KANSR:
             model: Pre-existing KAN model (optional, if provided width/grid/k are ignored)
         """
         # Set up logging
-        self.logger = logging.getLogger("LLMLEx.kansr")
+        self.logger = logging.getLogger("LLMLEx.kanLEx")
         self.logger.setLevel(log_level)
         self.logger.propagate = False  # Prevent propagation to parent loggers
         
@@ -1070,11 +1070,11 @@ class KANSR:
                 
                 # Only plot results that exist
                 if raw_result is not None:
-                    self._plot_expression(ax, xs, raw_result, "KANSR (raw)")
+                    self._plot_expression(ax, xs, raw_result, "KAN_LEx (raw)")
                 if refitted_result is not None:
-                    self._plot_expression(ax, xs, refitted_result, "KANSR (simp. and refit.)")
+                    self._plot_expression(ax, xs, refitted_result, "KAN_LEx (simp. and refit.)")
                 if llm_result is not None:
-                    self._plot_expression(ax, xs, llm_result, "KANSR (after LLM simp. and refit.)")
+                    self._plot_expression(ax, xs, llm_result, "KAN_LEx (after LLM simp. and refit.)")
                 
                 ax.legend()
                 plt.show()
@@ -2217,7 +2217,7 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
     """
     Run the complete KAN symbolic regression pipeline on a univariate function.
     
-    This is a convenience function that creates a KANSR instance and runs the complete pipeline.
+    This is a convenience function that creates a KAN_LEx instance and runs the complete pipeline.
     
     Args:
         client: Client for LLM API calls
@@ -2254,8 +2254,8 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
     if f is None:
         raise ValueError("Target function f must be provided")
     
-    kansr = KANSR(client=client, width=width, grid=grid, k=k, seed=seed, device=device)
-    return kansr.run_complete_pipeline(
+    kanlex = KAN_LEx(client=client, width=width, grid=grid, k=k, seed=seed, device=device)
+    return kanlex.run_complete_pipeline(
         client=client, f=f, ranges=ranges,
         train_steps=train_steps, generations=generations, gpt_model=gpt_model,
         node_th=node_th, edge_th=edge_th, 
