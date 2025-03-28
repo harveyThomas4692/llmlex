@@ -309,10 +309,11 @@ def call_model(client, model, image, prompt, system_prompt=None):
         #system_prompt = ("Give an improved ansatz to the list for the image. Follow on from the users text with no explaining."
         #                 "Params can be any length. If there's some noise in the data, give preference to simpler functions"
         # THIS IS THE SYSTEM PROMPT FOR THE SYNC MODEL - see LLMLEx.py for the async version
-        system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz (formula template). "
+        system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz. "
                          "Respond with ONLY the ansatz formula, without any explanation or commentary. Ensure it is in valid python. You may use numpy functions. "
                          "params is a list of parameters that can be of any length or complexity. "
-                         "Since the data contains noise, prioritize simpler, more elegant functions that capture the underlying pattern rather than fitting every point. ")
+                        )
+                         #"Since the data contains noise, prioritize simpler, more elegant functions that capture the underlying pattern rather than fitting every point. ")
         logger.debug("Using default system prompt: \n" + system_prompt)
     
     # Track image size for debugging purposes
@@ -382,10 +383,11 @@ async def async_call_model(client, model, image, prompt, system_prompt=None):
     
     # Set default system prompt if not provided
     if system_prompt is None:
-        system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz (formula template). "
+        system_prompt = ("You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz. "
                          "Respond with ONLY the ansatz formula, without any explanation or commentary. Ensure it is in valid python. You may use numpy functions. "
                          "params is a list of parameters that can be of any length or complexity. "
-                         "Since the data contains noise, prioritize simpler, more elegant functions that capture the underlying pattern rather than fitting every point. ")
+                        )
+                         #"Since the data contains noise, prioritize simpler, more elegant functions that capture the underlying pattern rather than fitting every point. ")
         logger.debug("Using default system prompt: \n" + system_prompt)
     
     # Track image size for debugging purposes
