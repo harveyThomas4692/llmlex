@@ -14,7 +14,7 @@ setuptools.setup(
     description="An open source python library for symbolic regression with LLMs",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    url="https://github.com/harveyThomas4692/LLM_SR",
+    url="https://github.com/harveyThomas4692/LLM_LEx",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

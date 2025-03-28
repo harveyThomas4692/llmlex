@@ -29,7 +29,7 @@ Or for development:
 ## Basic Usage
 
 ```python
-import LLMSR
+import LLM_LEx
 import openai
 import numpy as np
 import matplotlib.pyplot as plt
@@ -48,10 +48,10 @@ y = np.sin(np.pi * x) + 0.1 * np.random.randn(50)
 # Generate image of data (or use your own)
 fig, ax = plt.subplots()
 ax.scatter(x, y)
-base64_img = LLMSR.images.generate_base64_image(fig, ax, x, y)
+base64_img = LLM_LEx.images.generate_base64_image(fig, ax, x, y)
 
 # Run symbolic regression
-result = LLMSR.single_call(client, base64_img, x, y, model="openai/gpt-4o")
+result = LLM_LEx.single_call(client, base64_img, x, y, model="openai/gpt-4o")
 
 # View results
 print(f"Best function: {result['ansatz']}")
@@ -59,7 +59,7 @@ print(f"Parameters: {result['params']}")
 print(f"Score: {result['score']}")
 
 # For more complex problems, use genetic algorithm approach
-populations = LLMSR.run_genetic(
+populations = LLM_LEx.run_genetic(
     client, base64_img, x, y, 
     population_size=5, num_of_generations=3,
     model="openai/gpt-4o"
@@ -115,7 +115,7 @@ best_expressions, best_chi_squareds, results_dicts, results_all_dicts = multivar
 
 `KAN_LEx.generate_learned_f_function` finds the symbolic expression expressed as a python program, but does not simplify the expression. For that, use `optimise_expression` in the KANSR class, or `run_complete_pipeline` for a complete end-to-end pipeline.
 
-For a complete end-to-end symbolic regression pipeline using KANs, use the `run_complete_pipeline` function, or see the example notebook `Examples/kan_sr_example.ipynb`.
+For a complete end-to-end symbolic regression pipeline using KANs, use the `run_complete_pipeline` function, or see the example notebook `Examples/kanLEx_example.ipynb`.
 
 ```python
 # Complete KAN-SR Pipeline

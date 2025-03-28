@@ -73,7 +73,7 @@ class TestKANLExClass(unittest.TestCase):
         
         # Apply the patch
         self.mock_kan_class = mock_kan_constructor
-        mock_kan_patch = patch('LLMLEx.kanLEx.KAN', self.mock_kan_class)
+        mock_kan_patch = patch('LLM_LEx.kanLEx.KAN', self.mock_kan_class)
         mock_kan_patch.start()
         self.patches.append(mock_kan_patch)
         
@@ -88,7 +88,7 @@ class TestKANLExClass(unittest.TestCase):
         self.mock_kan.plot = MagicMock()
         
         # Mock dataset creation
-        mock_create_dataset = patch('LLMLEx.kanLEx.create_dataset')
+        mock_create_dataset = patch('LLM_LEx.kanLEx.create_dataset')
         self.mock_create_dataset = mock_create_dataset.start()
         self.patches.append(mock_create_dataset)
         self.mock_create_dataset.return_value = self.mock_dataset
@@ -109,7 +109,7 @@ class TestKANLExClass(unittest.TestCase):
         self.mock_fit_params.return_value = ([1.0], 0.001)
         
         # Mock NumPyPrinter to avoid issues
-        mock_numpy_printer = patch('LLMLex.kanLEx.NumPyPrinter')
+        mock_numpy_printer = patch('LLM_LEx.kanLEx.NumPyPrinter')
         self.mock_numpy_printer = mock_numpy_printer.start()
         self.patches.append(mock_numpy_printer)
         self.mock_numpy_printer.return_value.doprint.return_value = "x0**2"
@@ -121,7 +121,7 @@ class TestKANLExClass(unittest.TestCase):
         self.mock_eval.return_value = lambda x0: x0**2 if isinstance(x0, (int, float)) else np.array([x**2 for x in x0])
         
         # Mock sympy simplify to avoid issues
-        mock_simplify = patch('LLMLex.kanLEx.simplify')
+        mock_simplify = patch('LLM_LEx.kanLEx.simplify')
         self.mock_simplify = mock_simplify.start()
         self.patches.append(mock_simplify)
         self.mock_simplify.return_value = symbols('x0')**2
@@ -196,7 +196,7 @@ class TestKANLExClass(unittest.TestCase):
             return mock_kan_instance
         
         # Patch KAN with our special callable mock that tracks calls
-        with patch('LLMLex.kanLEx.KAN', side_effect=mock_kan_constructor) as mock_kan_class:
+        with patch('LLM_LEx.kanLEx.KAN', side_effect=mock_kan_constructor) as mock_kan_class:
             # Test with width, grid, k parameters
             kansr1 = KAN_LEx(
                 client=self.mock_client,
@@ -285,7 +285,7 @@ class TestKANLExClass(unittest.TestCase):
         
         # Test with no dataset provided
         # Create a fresh KAN_LEx instance for this test
-        with patch('LLMLex.kanLEx.KAN'):
+        with patch('LLM_LEx.kanLEx.KAN'):
             kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
             kansr.dataset = None  # Ensure no dataset is set
             with self.assertRaises(ValueError):
@@ -355,7 +355,7 @@ class TestKANLExClass(unittest.TestCase):
                 self.assertEqual(results_dicts[0]['best_chi_squared'], 0.001)
             
             # Test with non-trained model
-            with patch('LLMLex.kanLEx.KAN'):
+            with patch('LLM_LEx.kanLEx.KAN'):
                 kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
                 kansr.model = None  # Ensure model is not trained
                 with self.assertRaises(ValueError):
@@ -405,7 +405,7 @@ class TestKANLExClass(unittest.TestCase):
         self.assertEqual(self.kansr.expression_tree, result)
         
         # Test without symbolic expressions
-        with patch('LLMLex.kanLEx.KAN'):
+        with patch('LLM_LEx.kanLEx.KAN'):
             kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
             kansr.symbolic_expressions = None  # Ensure symbolic_expressions is not set
             with self.assertRaises(ValueError):
@@ -464,14 +464,14 @@ class TestKANLExClass(unittest.TestCase):
             mock_call_model.assert_called()
         
         # Test without node_tree
-        with patch('LLMLex.kanLEx.KAN'):
+        with patch('LLM_LEx.kanLEx.KAN'):
             kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
             kansr.expression_tree = None  # Ensure node_tree is not set
             with self.assertRaises(ValueError):
                 kansr.optimise_expressions(self.mock_client, "openai/gpt-4o")
         
         # Test without dataset
-        with patch('LLMLex.kanLEx.KAN'):
+        with patch('LLM_LEx.kanLEx.KAN'):
             kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
             kansr.expression_tree = self.kansr.expression_tree
             kansr.dataset = None  # Ensure dataset is not set
@@ -624,7 +624,7 @@ class TestKANLExClass(unittest.TestCase):
         mock_plt = MockPlt()
         
         # Apply patch to both matplotlib.pyplot and builtins.eval
-        with patch('LLMLex.kanLEx.plt', mock_plt), \
+        with patch('LLM_LEx.kanLEx.plt', mock_plt), \
              patch('builtins.eval', return_value=np.ones(1000)):
             # Create result dict with all required fields
             result_dict = {
@@ -837,7 +837,7 @@ class TestRunCompletePipeline(unittest.TestCase):
     def test_run_complete_pipeline_function(self):
         """Test the run_complete_pipeline function."""
         # Mock the KAN_LEx class and its run_complete_pipeline method
-        with patch('LLMLex.kanLEx.KAN_LEx') as mock_kansr_class:
+        with patch('LLM_LEx.kanLEx.KAN_LEx') as mock_kansr_class:
             # Setup mock instance and return value
             mock_instance = MagicMock()
             mock_kansr_class.return_value = mock_instance
