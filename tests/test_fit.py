@@ -7,7 +7,7 @@ import warnings
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from LLMSR.fit import fit_curve, get_n_chi_squared_from_predictions
+from LLM_LEx.fit import fit_curve, get_n_chi_squared_from_predictions
 
 class TestFit(unittest.TestCase):
     def setUp(self):
@@ -72,7 +72,7 @@ class TestFit(unittest.TestCase):
         
         # Temporarily suppress fit module logging
         import logging
-        logger = logging.getLogger("LLMSR.fit")
+        logger = logging.getLogger("LLM_LEx.fit")
         original_level = logger.level
         logger.setLevel(logging.CRITICAL)
         

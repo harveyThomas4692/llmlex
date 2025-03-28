@@ -24,7 +24,7 @@ except ImportError:
 # Suppress logging during tests
 logging.getLogger().setLevel(logging.CRITICAL)
 
-class TestLLMSR(unittest.TestCase):
+class TestLLM_LEx(unittest.TestCase):
     def setUp(self):
         """Set up test data for each test"""
         # Create simple test data 
@@ -69,10 +69,10 @@ class TestLLMSR(unittest.TestCase):
         
         # Instead of mocking lower-level call_model, mock at the highest level needed
         # This avoids issues with complex chained mocks
-        with patch('LLMSR.llmSR.call_model') as mock_call_model, \
-             patch('LLMSR.response.extract_ansatz') as mock_extract_ansatz, \
-             patch('LLMSR.response.fun_convert') as mock_fun_convert, \
-             patch('LLMSR.fit.fit_curve') as mock_fit_curve:
+        with patch('LLM_LEx.llmlex.call_model') as mock_call_model, \
+             patch('LLM_LEx.response.extract_ansatz') as mock_extract_ansatz, \
+             patch('LLM_LEx.response.fun_convert') as mock_fun_convert, \
+             patch('LLM_LEx.fit.fit_curve') as mock_fit_curve:
             
             # Set up the mocks with appropriate return values - need to mock formatted responses
             mock_call_model.return_value = """Based on the plot, I think the relationship can be modeled as:
@@ -111,10 +111,10 @@ This is a quadratic function that should fit the data well."""
         # Create async test function that patches the bare minimum of dependencies
         async def run_test():
             # Use all the needed patches
-            with patch('LLMSR.llmSR.async_call_model') as mock_async_call, \
-                 patch('LLMSR.response.extract_ansatz') as mock_extract_ansatz, \
-                 patch('LLMSR.response.fun_convert') as mock_fun_convert, \
-                 patch('LLMSR.fit.fit_curve') as mock_fit_curve:
+            with patch('LLM_LEx.llmlex.async_call_model') as mock_async_call, \
+                 patch('LLM_LEx.response.extract_ansatz') as mock_extract_ansatz, \
+                 patch('LLM_LEx.response.fun_convert') as mock_fun_convert, \
+                 patch('LLM_LEx.fit.fit_curve') as mock_fit_curve:
                 
                 # Configure all the mocks with appropriate return values that look like real API responses
                 mock_async_call.return_value = """Looking at the data plot, I can see this appears to be an oscillating function with decay.
@@ -194,7 +194,7 @@ This function captures both the oscillation and decay visible in the data."""
         
         try:
             # Patch only the external dependency
-            with patch('LLMSR.llmSR.async_single_call', side_effect=mock_async_single_call):
+            with patch('LLM_LEx.llmlex.async_single_call', side_effect=mock_async_single_call):
                 # Run with minimal generations and population
                 result = run_genetic(
                     self.async_client, 
@@ -368,7 +368,7 @@ class TestGenetic(unittest.TestCase):
         
         try:
             # Mock async_single_call to return our test sequence
-            with patch('LLMSR.llmSR.async_single_call', side_effect=mock_api_call):
+            with patch('LLM_LEx.llmlex.async_single_call', side_effect=mock_api_call):
                 # Run genetic algorithm with minimal settings 
                 result = run_genetic(
                     self.async_client,

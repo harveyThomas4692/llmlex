@@ -15,11 +15,11 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 # Import the modules to test
-from LLM_LEx.kanLEx import KANSR
+from LLM_LEx.kanLEx import KAN_LEx
 
 
-class TestKANSRMathematicalCorrectness(unittest.TestCase):
-    """Test cases for the mathematical correctness of the KANSR class."""
+class TestKANLExMathematicalCorrectness(unittest.TestCase):
+    """Test cases for the mathematical correctness of the KAN_LEx class."""
     
     def setUp(self):
         """Set up test fixtures."""
@@ -57,7 +57,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         y_data += np.random.normal(0, 0.1, size=y_data.shape)
         
         # Create a KANSR instance with our mock
-        kansr = KANSR(client=self.mock_client, model=self.mock_kan)
+        kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
         
         # Prepare the node tree structure that would normally come from build_expression_tree
         kansr.expression_tree = {
@@ -87,8 +87,8 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
             # Call the optimise_expressions method with our test data
             with patch('matplotlib.pyplot.subplots', return_value=(MagicMock(), MagicMock())), \
                  patch('matplotlib.pyplot.show'), \
-                 patch('LLMSR.kansr.get_n_chi_squared') as mock_chi_squared, \
-                 patch('LLMSR.kansr.fit_curve_with_guess_jax') as mock_fit:
+                 patch('LLM_LEx.kanLEx.get_n_chi_squared') as mock_chi_squared, \
+                 patch('LLM_LEx.kanLEx.fit_curve_with_guess_jax') as mock_fit:
                 
                 # Mock the chi-squared calculation to return realistic values
                 mock_chi_squared.return_value = 0.05
@@ -149,8 +149,8 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         np.random.seed(42)
         y_data += np.random.normal(0, 0.1, size=y_data.shape)
         
-        # Create a KANSR instance with our mock
-        kansr = KANSR(client=self.mock_client, model=self.mock_kan)
+        # Create a KAN_LEx instance with our mock
+        kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
         
         # Create a node tree that would simulate what we'd get from build_expression_tree
         kansr.expression_tree = {
@@ -180,8 +180,8 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
             # Call optimise_expressions with our test data
             with patch('matplotlib.pyplot.subplots', return_value=(MagicMock(), MagicMock())), \
                  patch('matplotlib.pyplot.show'), \
-                 patch('LLMSR.kansr.get_n_chi_squared') as mock_chi_squared, \
-                 patch('LLMSR.kansr.fit_curve_with_guess_jax') as mock_fit:
+                 patch('LLM_LEx.kanLEx.get_n_chi_squared') as mock_chi_squared, \
+                 patch('LLM_LEx.kanLEx.fit_curve_with_guess_jax') as mock_fit:
                 
                 # Set realistic return values
                 mock_chi_squared.return_value = 0.05
@@ -219,8 +219,8 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         np.random.seed(42)
         y_data += np.random.normal(0, 0.1, size=y_data.shape)
         
-        # Create KANSR instance
-        kansr = KANSR(client=self.mock_client, model=self.mock_kan)
+        # Create KAN_LEx instance
+        kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
         
         # Create node tree
         kansr.expression_tree = {
@@ -250,8 +250,8 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
             # Call optimise_expressions
             with patch('matplotlib.pyplot.subplots', return_value=(MagicMock(), MagicMock())), \
                  patch('matplotlib.pyplot.show'), \
-                 patch('LLMSR.kansr.get_n_chi_squared') as mock_chi_squared, \
-                 patch('LLMSR.kansr.fit_curve_with_guess_jax') as mock_fit:
+                 patch('LLM_LEx.kanLEx.get_n_chi_squared') as mock_chi_squared, \
+                 patch('LLM_LEx.kanLEx.fit_curve_with_guess_jax') as mock_fit:
                 
                 # Set realistic return values for a more complex function
                 mock_chi_squared.return_value = 0.1  # Might be higher due to complexity
@@ -292,7 +292,7 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
         }
         
         # Create a KANSR instance
-        kansr = KANSR(client=self.mock_client, model=self.mock_kan)
+        kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
         kansr.f = self.test_function
         kansr.results_all_dicts = [result_dict]
         
@@ -331,8 +331,8 @@ class TestKANSRMathematicalCorrectness(unittest.TestCase):
     
     def test_simplification_methods(self):
         """Test the mathematical correctness of expression simplification methods."""
-        # Create KANSR instance
-        kansr = KANSR(client=self.mock_client, model=self.mock_kan)
+        # Create KAN_LEx instance
+        kansr = KAN_LEx(client=self.mock_client, model=self.mock_kan)
         
         # Test _convert_sympy_to_numpy
         expr = "sin(x0)"

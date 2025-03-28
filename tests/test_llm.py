@@ -28,7 +28,7 @@ class TestLLM(unittest.TestCase):
         )
         self.assertEqual(prompt, expected)
     
-    @patch('LLMSR.llm.openai')
+    @patch('LLM_LEx.llm.openai')
     def test_call_model(self, mock_openai):
         """Test call_model function with mocked OpenAI"""
         # Create mock client and response
@@ -69,7 +69,7 @@ class TestLLM(unittest.TestCase):
         # Check that the result was returned
         self.assertEqual(result, mock_response)
     
-    @patch('LLMSR.llm._rate_limit_lock')
+    @patch('LLM_LEx.llm._rate_limit_lock')
     def test_async_call_model(self, mock_lock):
         """Test async_call_model function with mocked client"""
         # Create mocks for lock functionality
