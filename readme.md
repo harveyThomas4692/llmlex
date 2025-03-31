@@ -17,13 +17,16 @@ where:
 This metric smoothly transitions between absolute and relative error regimes. It should remain well-behaved even when variances and values approach zero.
 
 ## Installation
-(uv) pip install .
+Clone the GIT repository, navigate to the folder and install using pip.
+
+```bash
+pip install .
 ```
 
 Or for development:
 
 ```bash
-(uv) pip install -e .
+pip install -e .
 ```
 
 ## Basic Usage
