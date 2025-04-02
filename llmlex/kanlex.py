@@ -702,6 +702,7 @@ class KANLEX:
             'n_chi_squared': n_chi_squared_refitted_final,
             'fit_type': 'rawrefitted'
         }
+    
     def _round_floats_in_expression(self, expr):
         """Round all floating point numbers in the expression to 4 significant figures."""
         # Use regex to find floating point numbers in the expression
@@ -724,7 +725,6 @@ class KANLEX:
         # Replace all floats with rounded versions
         return re.sub(float_pattern, round_float_match, expr)
      
-
     def _attempt_llm_simplification(self, best_expression, x_data, y_data, Ninputs, ranges,
                                    client_to_use, gpt_model, custom_system_prompt, 
                                    num_answers_per_prompt, timeout_simplify, prune_amount, 
@@ -1191,7 +1191,6 @@ class KANLEX:
             self.logger.warning(f"Error in processing symbolic KAN directly to python function: {e}")
             return None, None
 
-
     def generate_learned_f_function(self,optimise_params = True, x = None, y_true = None, try_jax = True,  result_of_kan_to_symbolic = None):
         self.logger.info("Argument x of learned function are arraylike, NOT x0, x1, etc.")
         if result_of_kan_to_symbolic is None:
@@ -1205,9 +1204,6 @@ class KANLEX:
         else:
             optimised_params = self._find_optimised_for_full_python_kan_function(python_generated_function, x, y_true, best_params, learned_func_str, try_jax = try_jax)
             return python_generated_function, learned_func_str, best_params, optimised_params, total_params
-
-
-
 
     def _find_optimised_for_full_python_kan_function(self, python_generated_function, x, y_true, best_params, learned_func_str, try_jax = True):
         """
@@ -1288,7 +1284,6 @@ class KANLEX:
             self.logger.warning("Both optimisation methods failed, using original parameters")
         
         return best_params
-
 
     def plot_results(self, ranges=None, result_dict=None, dataset=None, title="KAN Symbolic Regression Results", 
                     plotmaxmin=[[None, None], [None, None]], plot_using_generate_f = False, n_points_in_each_direction=50, wireframe_fit=True,  plot_points=True, expressions_to_plot='best'):
@@ -1835,6 +1830,7 @@ class KANLEX:
                 
             self.logger.error(f"Error in pipeline: {e}, returning partial results: {list(results.keys())}")
             return results
+    
     # Helper methods
     def _subst_params(self, expr_param, param_values, round_to=4):
         """
