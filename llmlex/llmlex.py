@@ -2,18 +2,18 @@ import numpy as np
 from scipy.optimize import curve_fit
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from LLM_LEx.images import generate_base64_image, generate_base64_image_with_parents
-from LLM_LEx.llm import get_prompt, call_model, async_rate_limit_api_call, clear_rate_limit_lock, check_key_usage, async_call_model
-from LLM_LEx.response import extract_ansatz, fun_convert
+from llmlex.images import generate_base64_image, generate_base64_image_with_parents
+from llmlex.llm import get_prompt, call_model, async_rate_limit_api_call, clear_rate_limit_lock, check_key_usage, async_call_model
+from llmlex.response import extract_ansatz, fun_convert
 import logging
-import LLM_LEx.fit as fit
+import llmlex.fit as fit
 import asyncio
 import concurrent.futures
 import importlib.util
 import time
 import re
-from LLM_LEx.response import APICallStats
-from LLM_LEx.fit import get_n_chi_squared
+from llmlex.response import APICallStats
+from llmlex.fit import get_n_chi_squared
 
 # Check if nest_asyncio is available
 try:
@@ -23,7 +23,7 @@ except ImportError:
     nest_asyncio_available = False
 
 # Get module logger
-logger = logging.getLogger("LLMLEx.llmLEx")
+logger = logging.getLogger("llmlex.llmLEx")
 
 # Helper function to execute a coroutine in a way that works with any event loop state
 async def _run_in_nested_loop(coro):
@@ -129,7 +129,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
     # Create a local stats tracker if none provided
     local_stats = stats is not None
     if not local_stats:
-        from LLM_LEx.response import APICallStats
+        from llmlex.response import APICallStats
         stats = APICallStats()
     
     retry_count = 0
@@ -368,7 +368,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
     # Create a local stats tracker if none provided
     local_stats = stats is not None
     if not local_stats:
-        from LLM_LEx.response import APICallStats
+        from llmlex.response import APICallStats
         stats = APICallStats()
     
     retry_count = 0

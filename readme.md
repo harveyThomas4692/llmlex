@@ -1,5 +1,5 @@
-# Large Lange Model Learning Expressions (LLM_LEx)
-LLM_LEx is a Python library for symbolic regression using vision-capable Large Language Models. It finds mathematical formulae to fit your data by visualizing them as graphs and using LLMs to suggest equations. I recommend using the `uv` package manager to install the package - it's so much faster than pip!
+# Large Lange Model Learning Expressions (llmlex)
+llmlex is a Python library for symbolic regression using vision-capable Large Language Models. It finds mathematical formulae to fit your data by visualizing them as graphs and using LLMs to suggest equations. I recommend using the `uv` package manager to install the package - it's so much faster than pip!
 
 Our custom scoring function is a robust, approximately scale-invariant "normalized chi-squared" that handles both large and small values gracefully. Note that it isn't exactly scale invariance, because we actually (do/may) not want complete scale invariance. If the mean and MAD are close to zero, the score normalises by a small epsilon instead. This is so that functions that are approximately zero can be well-modelled by a fit which is simply zero.
 
@@ -32,7 +32,7 @@ pip install -e .
 ## Basic Usage
 
 ```python
-import LLM_LEx
+import llmlex
 import openai
 import numpy as np
 import matplotlib.pyplot as plt
@@ -51,10 +51,10 @@ y = np.sin(np.pi * x) + 0.1 * np.random.randn(50)
 # Generate image of data (or use your own)
 fig, ax = plt.subplots()
 ax.scatter(x, y)
-base64_img = LLM_LEx.images.generate_base64_image(fig, ax, x, y)
+base64_img = llmlex.images.generate_base64_image(fig, ax, x, y)
 
 # Run symbolic regression
-result = LLM_LEx.single_call(client, base64_img, x, y, model="openai/gpt-4o")
+result = llmlex.single_call(client, base64_img, x, y, model="openai/gpt-4o")
 
 # View results
 print(f"Best function: {result['ansatz']}")
@@ -62,7 +62,7 @@ print(f"Parameters: {result['params']}")
 print(f"Score: {result['score']}")
 
 # For more complex problems, use genetic algorithm approach
-populations = LLM_LEx.run_genetic(
+populations = llmlex.run_genetic(
     client, base64_img, x, y, 
     population_size=5, num_of_generations=3,
     model="openai/gpt-4o"
@@ -71,7 +71,7 @@ populations = LLM_LEx.run_genetic(
 
 ## Working with KANs (Kolmogorov-Arnold Networks)
 
-LLM_LEx can be used to extract interpretable symbolic expressions from trained KAN models:
+llmlex can be used to extract interpretable symbolic expressions from trained KAN models:
 
 ```python
 import torch
@@ -83,8 +83,8 @@ model = KAN(width=[2,1,1,1], grid=7, k=3, seed=0, device=device)
 
 # Create dataset
 f = lambda x: torch.exp(torch.sin(torch.pi*x[:,[0]]) + x[:,[1]]**2) # should be a torch function
-#Initialize a KAN_LEx instance for the multivariate function
-multivariate_kansr = KAN_LEx(
+#Initialize a KANLEX instance for the multivariate function
+multivariate_kansr = KANLEX(
     client=client,
     width=[2,5,1 1],  # 2 inputs, 5 hidden nodes, 1 output
     grid=5,
@@ -116,14 +116,14 @@ best_expressions, best_chi_squareds, results_dicts, results_all_dicts = multivar
 )
 ```
 
-`KAN_LEx.generate_learned_f_function` finds the symbolic expression expressed as a python program, but does not simplify the expression. For that, use `optimise_expression` in the KANSR class, or `run_complete_pipeline` for a complete end-to-end pipeline.
+`KANLEX.generate_learned_f_function` finds the symbolic expression expressed as a python program, but does not simplify the expression. For that, use `optimise_expression` in the KANSR class, or `run_complete_pipeline` for a complete end-to-end pipeline.
 
-For a complete end-to-end symbolic regression pipeline using KANs, use the `run_complete_pipeline` function, or see the example notebook `Examples/kanLEx_example.ipynb`.
+For a complete end-to-end symbolic regression pipeline using KANs, use the `run_complete_pipeline` function, or see the example notebook `Examples/kanlex_example.ipynb`.
 
 ```python
 # Complete KAN-SR Pipeline
 # Run the complete pipeline with custom parameters
-results = LLM_LEx.KAN_LEx.run_complete_pipeline(
+results = llmlex.KANLEX.run_complete_pipeline(
     client, f,
     ranges=x_range,
     width=[1, 4, 1],  # Use a wider network for this more complex function

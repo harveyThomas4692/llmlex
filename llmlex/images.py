@@ -3,7 +3,7 @@ import io
 import matplotlib.pyplot as plt
 import logging
 import os
-from LLM_LEx.response import fun_convert
+from llmlex.response import fun_convert
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D

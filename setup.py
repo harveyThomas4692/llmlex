@@ -7,14 +7,14 @@ with open("requirements.txt", "r") as fh:
     REQUIREMENTS = fh.read().splitlines()
 
 setuptools.setup(
-    name="LLM_LEx",
+    name="llmlex",
     version="0.0.1",
     author="Thomas R. Harvey",
     author_email="trharvey@mit.edu",
     description="An open source python library for symbolic regression with LLMs",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    url="https://github.com/harveyThomas4692/LLM_LEx",
+    url="https://github.com/harveyThomas4692/llmlex",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

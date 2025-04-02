@@ -21,12 +21,12 @@ import stopit
 import logging
 from kan import KAN, create_dataset
 
-import LLM_LEx.LLMLEx as LLMLEx
-from LLM_LEx.fit import get_n_chi_squared, fit_curve_with_guess, fit_curve_with_guess_jax, test_np_function_equivalence, get_n_chi_squared_from_predictions, test_data_equivalence
-import LLM_LEx.llm as llm
+import llmlex.llmlex as LLMLEx
+from llmlex.fit import get_n_chi_squared, fit_curve_with_guess, fit_curve_with_guess_jax, test_np_function_equivalence, get_n_chi_squared_from_predictions, test_data_equivalence
+import llmlex.llm as llm
 import tqdm
 
-class KAN_LEx:
+class KANLEX:
     """
     A class for performing symbolic regression using Kolmogorov-Arnold Networks (KANs).
     
