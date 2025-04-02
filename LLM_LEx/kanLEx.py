@@ -864,7 +864,7 @@ class KAN_LEx:
             
             # Try multiple prompts to get a valid LLM expression
             number_of_attempts = 2
-            self.logger.info(f"LLM simplification step - trying {number_of_prompts} prompts,. each with {num_answers_per_prompt} answers. Will attempt this process {number_of_attempts} times.")
+            self.logger.info(f"LLM simplification step - trying {number_of_prompts} prompts, each with {num_answers_per_prompt} answers. Will attempt this process {number_of_attempts} times.")
             for attempt_num in range(number_of_attempts):
                 attempt_result, attempt_all_results = self._attempt_llm_simplification(
                     best_expression, x_data, y_data, Ninputs, ranges,

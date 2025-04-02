@@ -56,3 +56,6 @@ LLMSR/.ipynb_checkpoints/llmSR-checkpoint.py
 /model
 .DS_Store
 .ipynb_checkpoints/KAN_SR copy-checkpoint.ipynb
+tests/.ipynb_checkpoints/test_kansr-checkpoint.py
+LLM_LEx/.ipynb_checkpoints/kanLEx-checkpoint.py
+/Examples/figures
