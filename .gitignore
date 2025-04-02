@@ -55,3 +55,4 @@ LLMSR/.ipynb_checkpoints/llmSR-checkpoint.py
 /LLMSR/__pycache__
 /model
 .DS_Store
+.ipynb_checkpoints/KAN_SR copy-checkpoint.ipynb
