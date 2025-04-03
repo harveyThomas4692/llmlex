@@ -1880,7 +1880,7 @@ class KANLEX:
         if 'square(' in str(expr):
             # Replace square() with x**2 pattern
             expr = re.sub(r'square\(([^)]+)\)', r'(\1)**2', str(expr))
-        expr_str = NumPyPrinter({'strict': False}).doprint(expr)
+        expr_str = NumPyPrinter().doprint(expr)
         
         # First convert any 'numpy.' to 'np.' to standardize
         expr_str = re.sub(r'numpy\.', 'np.', expr_str)
