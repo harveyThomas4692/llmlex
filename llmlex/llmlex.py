@@ -23,7 +23,7 @@ except ImportError:
     nest_asyncio_available = False
 
 # Get module logger
-logger = logging.getLogger("llmlex.llmLEx")
+logger = logging.getLogger("llmlex.llmlex")
 
 # Helper function to execute a coroutine in a way that works with any event loop state
 async def _run_in_nested_loop(coro):
@@ -509,8 +509,6 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
         logger.error("Unknown error in async_single_call")
         raise RuntimeError("Unknown error in async_single_call")
 
-
-
 def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                 temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5, system_prompt=None, 
                 elite=False, for_kan=False, use_async=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings = False):
@@ -832,7 +830,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     
     return populations
 
-def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings = False):
+def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings=False):
     """
     Converts a given kan model symbolic representations using llmlexs.
     Parameters:
@@ -942,11 +940,15 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                     
                     # Run genetic algorithm to find symbolic expression
                     try:
+                        # change system prompt for KANs -  we need less summands, since these are already covered by the KAN architecture
+                        system_prompt = "You are a symbolic regression expert. Analyze the data in the image and provide an improved mathematical ansatz. The ansatz should have as few terms as possible and ideally no sums." +\
+                         				"Respond with ONLY the ansatz formula, without any explanation or commentary. Ensure it is in valid python. You may use numpy functions." +\
+                         				"params is a list of parameters that can be of any length or complexity."
                         logger.info(f"Running genetic algorithm for connection ({l},{i},{j})")
                         res = run_genetic(
                             client, base64_image, x, y, population, generations, 
                             temperature=temperature, model=gpt_model, 
-                            system_prompt=None, elite=False, 
+                            system_prompt=system_prompt, elite=False, 
                             exit_condition=exit_condition, for_kan=True,
                             use_async=use_async, plot_parents=plot_parents,demonstrate_parent_plotting=demonstrate_parent_plotting, constant_on_failure=constant_on_failure, disable_parse_warnings=disable_parse_warnings
                         )
@@ -1027,7 +1029,6 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
     logger.info(f"API key usage whilst this kan_to_symbolic was running: {cost}")
     
     return res_fcts
-
 
 def generate_learned_f(sym_expr):
     """
@@ -1133,11 +1134,7 @@ def generate_learned_f(sym_expr):
     
     total_num_params = param_index
     return "\n".join(lines), total_num_params, np.array(best_params)
-
-
-
-
-                
+              
 def validate_function_output(x, f, params, stats):
     """
     Validates that a function produces correct output shape for the input data.
