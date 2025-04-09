@@ -1921,9 +1921,14 @@ class KANLEX:
         original_formula = formula
         last_good_formula = formula
         # Define symbolic variables and functions
-        variables = symbols(f'x0:{N+1}')
-        used_functions = {name: self.numpy_to_sympy[name] for name in self.numpy_to_sympy if f'{name}' in formula}
-        safe_dict = {f'x{i}': variables[i] for i in range(N+1)}
+        if N > 1:
+            variables = symbols(f'x0:{N+1}')
+            safe_dict = {f'x{i}': variables[i] for i in range(N+1)}
+        else:
+            variables = symbols(f'x')
+            safe_dict = {f'x': variables}
+
+        used_functions = {name: self.numpy_to_sympy[name] for name in self.numpy_to_sympy if f'{name}' in formula}        
         safe_dict.update(used_functions)  # Add only used symbolic functions
         safe_dict.update({'sp': sp})
         
