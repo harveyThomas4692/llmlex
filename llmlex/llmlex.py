@@ -98,7 +98,7 @@ def execute_async_in_loop(coro):
             else:
                 asyncio.set_event_loop(None)
     
-def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=None, system_prompt=None, max_retries=3, stats=None):
+def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=None, system_prompt=None, max_retries=3, stats=None, imports=None):
     """
     Executes a single call of to a specified llm-model with given parameters and processes the response.
     Args:
@@ -111,6 +111,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
         system_prompt (str, optional): A system-level prompt to guide the model's behavior. Defaults to None.
         max_retries (int, optional): Maximum number of retries for parsing errors. Default is 3.
         stats (APICallStats, optional): Statistics tracking object. If None, a new one will be created.
+        imports (list, optional): A list of import statements to include in the prompt. Defaults to ["import numpy as np"].
     Returns:
         dict: A dictionary containing the following keys on success:
             - "params": The parameters resulting from the curve fitting.
@@ -141,7 +142,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
         try:
             # Generate the prompt
             logger.debug("Generating prompt")
-            prompt = get_prompt(function_list)
+            prompt = get_prompt(function_list, imports=imports)
             
             # Make API call
             try:
@@ -344,7 +345,7 @@ def single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=Non
 
 #        raise
 
-async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=None, system_prompt=None, max_retries=3, stats=None, plot_parents=False):
+async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", function_list=None, system_prompt=None, max_retries=3, stats=None, plot_parents=False, imports=None):
     """
     Asynchronous version of single_call. Executes a single call to a specified llm-model with given parameters.
     This function is meant to be used with asyncio to allow for concurrent model calls.
@@ -359,6 +360,8 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
         system_prompt: Optional system prompt
         max_retries: Maximum number of retries for parsing/formatting errors
         stats: Optional APICallStats object for tracking statistics
+        plot_parents: Whether to plot parents in the genetic algorithm
+        imports: A list of import statements to include in the prompt. Defaults to ["import numpy as np"]
     
     Returns: 
         dict: Result dictionary or None if all attempts fail
@@ -378,7 +381,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
         retry_count += 1
         try:
             # Get the proper prompt based on function_list
-            prompt = get_prompt(function_list)
+            prompt = get_prompt(function_list, imports=imports)
             if plot_parents:
                 prompt = "\n\nThe listed curve_# functions (faded and broken lines) are plotted on the same image as the data (solid blue line).\
                   The coefficients the curve_# functions are plotted with are optimised with gradient descent. Use this information to improve the ansatz.\n" + prompt
@@ -511,7 +514,7 @@ async def async_single_call(client, img, x, y, model="openai/gpt-4o-mini", funct
 
 def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                 temperature=1., model="openai/gpt-4o-mini", exit_condition=1e-5, system_prompt=None, 
-                elite=False, for_kan=False, use_async=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings = False):
+                elite=False, for_kan=False, use_async=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings=False, imports=None):
     """
         Run a genetic algorithm to fit a model to the given data.
         Parameters:
@@ -530,6 +533,8 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
             plot_parents (bool, optional): Whether to plot the parents in the genetic algorithm, showing the model the shape of the optimise parents. Default is False.
             demonstrate_parent_plotting (bool, optional): Whether to show to the user an example of the parent plotting. Default is False.
             constant_on_failure (bool, optional): Whether to return the constant function if the genetic algorithm fails. Default is False.
+            disable_parse_warnings (bool, optional): Whether to disable parse warnings. Default is False.
+            imports (list, optional): A list of import statements to include in the prompt. Defaults to ["import numpy as np"].
         Returns:
             list: A list of populations, where each population is a list of individuals.
         """
@@ -592,7 +597,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                         logger.debug(f"Async: Generating individual, attempt {attempt+1}/{max_attempts}")
                         result = await async_single_call(
                             client, base64_image, x, y, model=model, system_prompt=system_prompt,
-                            stats=api_stats
+                            stats=api_stats, imports=imports
                         )
                         if result is not None:
                             # Stats already updated in async_single_call
@@ -728,7 +733,8 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                                     client, base64_image, x, y, model=model,
                                     function_list=func_list, system_prompt=system_prompt,
                                     stats=api_stats,
-                                    plot_parents = plot_parents
+                                    plot_parents=plot_parents,
+                                    imports=imports
                                 )
                                 if result is not None:
                                     # Stats already updated in async_single_call
@@ -769,7 +775,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
                     try:
                         result = single_call(client, base64_image, x, y, model=model,
                                             function_list=func_lists[funcs], system_prompt=system_prompt,
-                                            stats=api_stats)
+                                            stats=api_stats, imports=imports)
                         if result is not None:
                             population.append(result)
                             good = True
@@ -830,7 +836,7 @@ def run_genetic(client, base64_image, x, y, population_size, num_of_generations,
     
     return populations
 
-def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings=False):
+def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, gpt_model="openai/gpt-4o-mini", exit_condition=1e-3, verbose=0, use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False, disable_parse_warnings=False, imports=None):
     """
     Converts a given kan model symbolic representations using llmlexs.
     Parameters:
@@ -848,6 +854,7 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
         demonstrate_parent_plotting (bool, optional): Whether to demonstrate the parent plotting. Default is False.
         constant_on_failure (bool, optional): Whether to return the constant function if the genetic algorithm fails. Default is False.
         disable_parse_warnings (bool, optional): Whether to disable parse warnings. Default is False.
+        imports (list, optional): A list of import statements to include in the prompt. Default is None.
     Returns:
         - res_fcts (dict): A dictionary mapping layer, input, and output indices to their corresponding symbolic functions.
     """
@@ -950,7 +957,9 @@ def kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1
                             temperature=temperature, model=gpt_model, 
                             system_prompt=system_prompt, elite=False, 
                             exit_condition=exit_condition, for_kan=True,
-                            use_async=use_async, plot_parents=plot_parents,demonstrate_parent_plotting=demonstrate_parent_plotting, constant_on_failure=constant_on_failure, disable_parse_warnings=disable_parse_warnings
+                            use_async=use_async, plot_parents=plot_parents,demonstrate_parent_plotting=demonstrate_parent_plotting, 
+                            constant_on_failure=constant_on_failure, disable_parse_warnings=disable_parse_warnings,
+                            imports=imports
                         )
                         res_fcts[(l,i,j)] = res
                         logger.info(f"Successfully found expression for connection ({l},{i},{j})")

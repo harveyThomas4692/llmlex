@@ -7,13 +7,13 @@ from unittest.mock import MagicMock, patch
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from LLM_LEx.llm import get_prompt, call_model, async_call_model
+from llmlex.llm import get_prompt, call_model, async_call_model
 
 class TestLLM(unittest.TestCase):
     def test_get_prompt_default(self):
         """Test get_prompt with default parameters"""
         prompt = get_prompt()
-        expected = "import numpy as np \ncurve_0 = lambda x, *params: params[0] \ncurve_1 = lambda x, *params:"
+        expected = "import numpy as np\ncurve_0 = lambda x, *params: params[0] \ncurve_1 = lambda x, *params:"
         self.assertEqual(prompt, expected)
     
     def test_get_prompt_custom(self):
@@ -21,14 +21,40 @@ class TestLLM(unittest.TestCase):
         function_list = [("params[0] * x**2", 1), ("params[0] * np.sin(params[1] * x)", 2)]
         prompt = get_prompt(function_list)
         expected = (
-            "import numpy as np \n"
+            "import numpy as np\n"
             "curve_0 = lambda x, *params: params[0] * x**2 \n"
             "curve_1 = lambda x, *params: params[0] * np.sin(params[1] * x) \n"
             "curve_2 = lambda x, *params:"
         )
         self.assertEqual(prompt, expected)
+        
+    def test_get_prompt_custom_imports(self):
+        """Test get_prompt with custom imports"""
+        function_list = [("params[0] * x**2", 1)]
+        imports = ["import numpy as np", "import scipy.special as sp"]
+        prompt = get_prompt(function_list, imports=imports)
+        expected = (
+            "import numpy as np\n"
+            "import scipy.special as sp\n"
+            "curve_0 = lambda x, *params: params[0] * x**2 \n"
+            "curve_1 = lambda x, *params:"
+        )
+        self.assertEqual(prompt, expected)
+        
+    def test_get_prompt_scipy_bessel(self):
+        """Test get_prompt with scipy bessel functions"""
+        function_list = [("params[0] * sp.jv(0, params[1] * x)", 2)]
+        imports = ["import numpy as np", "import scipy.special as sp"]
+        prompt = get_prompt(function_list, imports=imports)
+        expected = (
+            "import numpy as np\n"
+            "import scipy.special as sp\n"
+            "curve_0 = lambda x, *params: params[0] * sp.jv(0, params[1] * x) \n"
+            "curve_1 = lambda x, *params:"
+        )
+        self.assertEqual(prompt, expected)
     
-    @patch('LLM_LEx.llm.openai')
+    @patch('llmlex.llm.openai')
     def test_call_model(self, mock_openai):
         """Test call_model function with mocked OpenAI"""
         # Create mock client and response
@@ -69,7 +95,7 @@ class TestLLM(unittest.TestCase):
         # Check that the result was returned
         self.assertEqual(result, mock_response)
     
-    @patch('LLM_LEx.llm._rate_limit_lock')
+    @patch('llmlex.llm._rate_limit_lock')
     def test_async_call_model(self, mock_lock):
         """Test async_call_model function with mocked client"""
         # Create mocks for lock functionality

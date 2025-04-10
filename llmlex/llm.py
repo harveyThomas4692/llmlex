@@ -261,29 +261,39 @@ def check_credits_remaining(client):
         logger.error(f"Error checking API key credit balance: {e}", exc_info=True)
         raise
     
-def get_prompt(function_list=None):
+def get_prompt(function_list=None, imports=None):
     """
     Generates the user prompt given a list of functions.
     Args:
         function_list (list, optional): A list of strings where each string is a mathematical expression to be used in the lambda functions. 
                                         If None, defaults to ["params[0]"].
+        imports (list, optional): A list of import statements to include at the beginning of the prompt.
+                                  If None, defaults to ["import numpy as np"].
     Returns:
         str: A string containing the generated user prompt with lambda function definitions.
     """
-    logger.debug(f"Generating prompt with function_list: {function_list}")
+    logger.debug(f"Generating prompt with function_list: {function_list}, imports: {imports}")
     
     # Use default if no function list provided
     if function_list is None:
         function_list = [("params[0]", 1)]
         logger.debug("No function list provided, using default: ['params[0]']")
     
+    # Use default imports if none provided
+    if imports is None:
+        imports = ["import numpy as np"]
+        logger.debug("No imports provided, using default: ['import numpy as np']")
+    
     # Build the prompt
-    prompt = "import numpy as np \n"
+    prompt = ""
+    for import_stmt in imports:
+        prompt += f"{import_stmt}\n"
+        
     for n in range(len(function_list)):
         prompt += f"curve_{n} = lambda x, *params: {function_list[n][0]} \n"
     prompt += f"curve_{len(function_list)} = lambda x, *params:"
 
-    logger.debug(f"Generated prompt with {len(function_list)} functions")
+    logger.debug(f"Generated prompt with {len(function_list)} functions and {len(imports)} imports")
     return prompt
 
 @rate_limit_api_call
@@ -295,9 +305,7 @@ def call_model(client, model, image, prompt, system_prompt=None):
         model (str): The name or identifier of the model to be used.
         image (str): The image data encoded in base64 format.
         prompt (str): The text prompt provided by the user.
-        system_prompt (str, optional): The system prompt to guide the model's response. If none provided it defaults to:
-                                        "Give an improved ansatz in python to the list for the image. Follow on from the users text with no explaining.
-                                        Params can be any length. If there's some noise in the data, give preference to simpler functions"
+        system_prompt (str, optional): The system prompt to guide the model's response. If none provided the default prompt is used"
     Returns:
         dict: The response from the model, typically containing the generated text or other relevant information.
     """

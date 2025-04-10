@@ -86,7 +86,7 @@ This is a quadratic function that should fit the data well."""
             mock_fun_convert.return_value = (mock_function, 3, f"lambda x, *params: {test_ansatz}")
             mock_fit_curve.return_value = (test_params, test_chi_squared)
             
-            # Call the function
+            # Call the function - first with default imports
             result = single_call(self.client, self.base64_image, self.x, self.y)
             
             # Verify the result structure
@@ -99,6 +99,16 @@ This is a quadratic function that should fit the data well."""
             self.assertEqual(result['ansatz'], test_ansatz)
             np.testing.assert_array_equal(result['params'], test_params)
             self.assertEqual(result['score'], -test_chi_squared)  # Score is negative of chi-squared
+            
+            # Now test with custom imports
+            custom_imports = ["import numpy as np", "import scipy.special as sp"]
+            result_with_imports = single_call(self.client, self.base64_image, self.x, self.y, imports=custom_imports)
+            
+            # Verify it also works with imports parameter
+            self.assertIsInstance(result_with_imports, dict)
+            self.assertEqual(result_with_imports['ansatz'], test_ansatz)
+            np.testing.assert_array_equal(result_with_imports['params'], test_params)
+            self.assertEqual(result_with_imports['score'], -test_chi_squared)
 
     def test_async_single_call(self):
         """Test the async_single_call function with comprehensive mocking"""
@@ -128,7 +138,7 @@ This function captures both the oscillation and decay visible in the data."""
                 mock_fun_convert.return_value = (test_func, 3, f"lambda x, *params: {test_ansatz}")  
                 mock_fit_curve.return_value = (test_params, test_chi_squared)
                 
-                # Call the function we're testing
+                # Call the function with default imports
                 result = await async_single_call(
                     self.async_client, 
                     self.base64_image, 
@@ -147,6 +157,22 @@ This function captures both the oscillation and decay visible in the data."""
                 self.assertEqual(result['ansatz'], test_ansatz)
                 np.testing.assert_array_equal(result['params'], test_params)
                 self.assertEqual(result['score'], -test_chi_squared)
+                
+                # Test with custom imports
+                custom_imports = ["import numpy as np", "import scipy.special as sp"]
+                result_with_imports = await async_single_call(
+                    self.async_client, 
+                    self.base64_image, 
+                    self.x, 
+                    self.y,
+                    imports=custom_imports
+                )
+                
+                # Verify it also works with imports parameter
+                self.assertIsInstance(result_with_imports, dict)
+                self.assertEqual(result_with_imports['ansatz'], test_ansatz)
+                np.testing.assert_array_equal(result_with_imports['params'], test_params)
+                self.assertEqual(result_with_imports['score'], -test_chi_squared)
                 
                 return result
         
@@ -195,7 +221,7 @@ This function captures both the oscillation and decay visible in the data."""
         try:
             # Patch only the external dependency
             with patch('LLM_LEx.llmlex.async_single_call', side_effect=mock_async_single_call):
-                # Run with minimal generations and population
+                # Run with minimal generations and population, default imports
                 result = run_genetic(
                     self.async_client, 
                     self.base64_image, 
@@ -206,12 +232,38 @@ This function captures both the oscillation and decay visible in the data."""
                     exit_condition=0.0001
                 )
                 
+                # Test with custom imports
+                result_with_imports = run_genetic(
+                    self.async_client, 
+                    self.base64_image, 
+                    self.x, 
+                    self.y,
+                    population_size=2,
+                    num_of_generations=2,
+                    exit_condition=0.0001,
+                    imports=["import numpy as np", "import scipy.special as sp"]
+                )
+                
                 # Verify the overall structure without checking implementation details
                 self.assertIsInstance(result, list)
                 self.assertEqual(len(result), 2)  # 2 generations
                 
                 # Each generation should have a population
                 for gen in result:
+                    self.assertGreaterEqual(len(gen), 1)
+                    
+                    # Each member should have basic properties
+                    for member in gen:
+                        self.assertIn('ansatz', member)
+                        self.assertIn('params', member)
+                        self.assertIn('score', member)
+                
+                # Verify the same for the run with imports
+                self.assertIsInstance(result_with_imports, list)
+                self.assertEqual(len(result_with_imports), 2)  # 2 generations
+                
+                # Each generation should have a population
+                for gen in result_with_imports:
                     self.assertGreaterEqual(len(gen), 1)
                     
                     # Each member should have basic properties

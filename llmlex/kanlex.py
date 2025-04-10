@@ -207,7 +207,7 @@ class KANLEX:
                            gpt_model="openai/gpt-4o", exit_condition=None, verbose=0, 
                            use_async=True, plot_fit=True, plot_parents=False, demonstrate_parent_plotting=False, constant_on_failure=False,
                            num_answers_per_prompt=3, timeout_simplify=10, custom_system_prompt_for_second_simplification=None,
-                           prune_small_terms=True, plot_all=True, original_f=None, number_of_prompts=3, simplification_gpt_model=None):
+                           prune_small_terms=True, plot_all=True, original_f=None, number_of_prompts=3, simplification_gpt_model=None, imports=None):
         """
         Convert the trained KAN model to symbolic expressions.
         
@@ -232,6 +232,7 @@ class KANLEX:
             demonstrate_parent_plotting: Whether to demonstrate parent plotting
             constant_on_failure: Whether to use a constant on failure
             simplification_gpt_model: GPT model to use for simplification
+            imports: List of import statements to include in the prompt (optional)
 
         Returns:
             List of best expressions
@@ -277,7 +278,8 @@ class KANLEX:
             self.model, client_to_use, population=population, generations=generations,
             temperature=temperature, gpt_model=gpt_model, exit_condition=exit_condition,
             verbose=verbose, use_async=use_async, plot_fit=plot_fit, plot_parents=plot_parents,
-            demonstrate_parent_plotting=demonstrate_parent_plotting, constant_on_failure=constant_on_failure
+            demonstrate_parent_plotting=demonstrate_parent_plotting, constant_on_failure=constant_on_failure,
+            imports=imports
         )
         
         self.symbolic_expressions = self._sort_symbolic_expressions(result_of_kan_to_symbolic)
