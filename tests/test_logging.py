@@ -3,7 +3,7 @@ import logging
 import io
 import sys
 import asyncio
-import LLM_LEx
+import llmlex
 import numpy as np
 import matplotlib.pyplot as plt
 import tempfile
@@ -11,7 +11,7 @@ import os
 from unittest.mock import patch, MagicMock, AsyncMock
 
 class TestLogging(unittest.TestCase):
-    """Test suite for verifying proper logging functionality in LLM_LEx"""
+    """Test suite for verifying proper logging functionality in llmlex"""
     
     def setUp(self):
         """Set up for each test case"""
@@ -45,13 +45,13 @@ class TestLogging(unittest.TestCase):
         # Check submodule loggers
         submodules = ['llmLEx', 'llm', 'fit', 'images', 'response']
         for submodule in submodules:
-            logger = logging.getLogger(f"LLMLEx.{submodule}")
+            logger = logging.getLogger(f"llmlex.{submodule}")
             # Verify logger exists and inherits from root logger
             self.assertEqual(logger.parent, self.root_logger)
     
     def test_log_levels(self):
         """Test that different log levels work properly"""
-        logger = logging.getLogger("LLMLEx.test")
+        logger = logging.getLogger("llmlex.test")
         
         # Log at different levels
         logger.debug("Debug message")
@@ -63,10 +63,10 @@ class TestLogging(unittest.TestCase):
         log_content = self.log_capture.getvalue()
         
         # Check messages at all levels
-        self.assertIn("DEBUG:LLMLEx.test:Debug message", log_content)
-        self.assertIn("INFO:LLMLEx.test:Info message", log_content)
-        self.assertIn("WARNING:LLMLEx.test:Warning message", log_content)
-        self.assertIn("ERROR:LLMLEx.test:Error message", log_content)
+        self.assertIn("DEBUG:llmlex.test:Debug message", log_content)
+        self.assertIn("INFO:llmlex.test:Info message", log_content)
+        self.assertIn("WARNING:llmlex.test:Warning message", log_content)
+        self.assertIn("ERROR:llmlex.test:Error message", log_content)
     
     def test_images_logging_success_path(self):
         """Test logging in images module for successful operations"""
@@ -76,16 +76,16 @@ class TestLogging(unittest.TestCase):
         y = x**2
         
         # Call the function
-        result = LLM_LEx.images.generate_base64_image(fig, ax, x, y)
+        result = llmlex.images.generate_base64_image(fig, ax, x, y)
         plt.close(fig)
         
         # Get log output
         log_content = self.log_capture.getvalue()
         
         # Verify appropriate log levels for normal operation
-        self.assertIn("DEBUG:LLMLEx.images:Generating base64 image", log_content)
+        self.assertIn("DEBUG:llmlex.images:Generating base64 image", log_content)
         # Success should be logged at debug level, not higher
-        self.assertNotIn("INFO:LLMLEx.images:Successfully generated", log_content.upper())
+        self.assertNotIn("INFO:llmlex.images:Successfully generated", log_content.upper())
         self.assertNotIn("ERROR", log_content)
     
     def test_images_logging_error_path(self):
@@ -97,7 +97,7 @@ class TestLogging(unittest.TestCase):
             
         # Attempt to encode a nonexistent image
         with self.assertRaises(FileNotFoundError):
-            LLM_LEx.images.encode_image(nonexistent_path)
+            llmlex.images.encode_image(nonexistent_path)
             
         # Get log output
         log_content = self.log_capture.getvalue()
@@ -105,7 +105,7 @@ class TestLogging(unittest.TestCase):
         # Verify errors are logged appropriately
         self.assertIn("ERROR:LLMSR.images:Image file not found", log_content)
 
-    @patch('LLMLEx.llm.requests.get')
+    @patch('llmlex.llm.requests.get')
     def test_llm_logging_network_events(self, mock_get):
         """Test that network operations in llm module are logged properly"""
         # Setup success response
@@ -120,7 +120,7 @@ class TestLogging(unittest.TestCase):
         client.base_url = "https://example.com"
         
         # Call the function - success path
-        result = LLM_LEx.llm.check_key_limit(client)
+        result = llmlex.llm.check_key_limit(client)
         
         # Clear the log capture
         log_content = self.log_capture.getvalue()
@@ -128,7 +128,7 @@ class TestLogging(unittest.TestCase):
         self.log_capture.seek(0)
         
         # Check success logs contain appropriate information without implementation details
-        self.assertIn("DEBUG:LLMLEx.llm:Checking API key usage limit", log_content)
+        self.assertIn("DEBUG:llmlex.llm:Checking API key usage limit", log_content)
         self.assertIn("API key check successful", log_content)
         
         # Now test error path
@@ -136,19 +136,19 @@ class TestLogging(unittest.TestCase):
         mock_get.return_value = mock_response
         
         # Call the function - error path
-        result = LLM_LEx.llm.check_key_limit(client)
+        result = llmlex.llm.check_key_limit(client)
         
         # Get new log content
         log_content = self.log_capture.getvalue()
         
         # Check error is logged at appropriate level
-        self.assertIn("ERROR:LLMLEx.llm:", log_content)
+        self.assertIn("ERROR:llmlex.llm:", log_content)
     
     def test_fit_module_logging_behavior(self):
         """Test that the fit module logs appropriate events at appropriate levels"""
         # Mock curve_fit to avoid actual fitting
-        with patch('LLMLEx.fit.curve_fit') as mock_curve_fit, \
-             patch('LLMLEx.fit.get_n_chi_squared_from_predictions') as mock_chi_squared:
+        with patch('llmlex.fit.curve_fit') as mock_curve_fit, \
+             patch('llmlex.fit.get_n_chi_squared_from_predictions') as mock_chi_squared:
             
             # Setup successful return
             mock_curve_fit.return_value = (np.array([1.0, 2.0]), None)
@@ -160,7 +160,7 @@ class TestLogging(unittest.TestCase):
             curve = lambda x, a, b: a * x**b
             
             # Call function - success path
-            params, n_chi_squared = LLM_LEx.fit.fit_curve(x, y, curve, 2)
+            params, n_chi_squared = llmlex.fit.fit_curve(x, y, curve, 2)
             
             # Get log output
             log_content = self.log_capture.getvalue()
@@ -168,21 +168,21 @@ class TestLogging(unittest.TestCase):
             self.log_capture.seek(0)
             
             # Verify debug logs for successful operation
-            self.assertIn("DEBUG:LLMLEx.fit:Fitting curve with", log_content)
-            self.assertIn("DEBUG:LLMLEx.fit:Optimised parameters", log_content)
-            self.assertNotIn("ERROR:LLMLEx.fit:", log_content)
+            self.assertIn("DEBUG:llmlex.fit:Fitting curve with", log_content)
+            self.assertIn("DEBUG:llmlex.fit:Optimised parameters", log_content)
+            self.assertNotIn("ERROR:llmlex.fit:", log_content)
             
             # Now test error path by making curve_fit raise an exception
             mock_curve_fit.side_effect = RuntimeError("Test error")
             
             # Call function - error path
-            params, n_chi_squared = LLM_LEx.fit.fit_curve(x, y, curve, 2)
+            params, n_chi_squared = llmlex.fit.fit_curve(x, y, curve, 2)
             
             # Get log output
             log_content = self.log_capture.getvalue()
             
             # Verify error is logged appropriately
-            self.assertIn("INFO:LLMLEx.fit:All methods failed for this fit", log_content)
+            self.assertIn("INFO:llmlex.fit:All methods failed for this fit", log_content)
     
     def test_response_logging_with_parse_errors(self):
         """Test that the response module logs parsing errors appropriately"""
@@ -194,14 +194,14 @@ class TestLogging(unittest.TestCase):
         
         # Attempt to extract ansatz - should fail
         with self.assertRaises(ValueError):
-            LLM_LEx.response.extract_ansatz(mock_response)
+            llmlex.response.extract_ansatz(mock_response)
         
         # Get log output
         log_content = self.log_capture.getvalue()
         
         # Verify appropriate debug logs leading up to error
-        self.assertIn("DEBUG:LLMLEx.response:Extracting ansatz from model response", log_content)
-        self.assertIn("DEBUG:LLMLEx.response:No parameters found", log_content)
+        self.assertIn("DEBUG:llmlex.response:Extracting ansatz from model response", log_content)
+        self.assertIn("DEBUG:llmlex.response:No parameters found", log_content)
 
 if __name__ == '__main__':
     unittest.main()

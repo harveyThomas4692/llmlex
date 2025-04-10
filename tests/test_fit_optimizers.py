@@ -8,7 +8,7 @@ import warnings
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from LLM_LEx.fit import (
+from llmlex.fit import (
     fit_curve,
     fit_curve_with_guess,
     fit_curve_with_guess_jax,

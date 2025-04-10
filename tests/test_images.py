@@ -11,7 +11,7 @@ from PIL import Image
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from LLM_LEx.images import encode_image, generate_base64_image
+from llmlex.images import encode_image, generate_base64_image
 from tests.test_data.generate_test_data import generate_test_data
 
 class TestImages(unittest.TestCase):

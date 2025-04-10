@@ -5,7 +5,7 @@ import sys
 
 # Add the parent directory to the path to import LLMSR
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from LLM_LEx.images import generate_base64_image
+from llmlex.images import generate_base64_image
 
 def generate_test_data():
     """Generate test data for unit tests"""

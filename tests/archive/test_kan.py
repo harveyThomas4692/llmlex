@@ -16,10 +16,10 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 # Import the modules to test
-import LLM_LEx.LLMLEx
+import llmlex.LLMLEx
 # For backward compatibility, we still test the old kan_sr module
 # but we're using the new implementation from kansr.py
-import LLM_LEx.old_kan_sr as kan_sr
+import llmlex.old_kan_sr as kan_sr
 
 # Create a modified version of kan_to_symbolic that handles the symb_formula issue
 def test_kan_to_symbolic(model, client, population=10, generations=3, temperature=0.1, 
@@ -28,7 +28,7 @@ def test_kan_to_symbolic(model, client, population=10, generations=3, temperatur
     A test-friendly version of kan_to_symbolic that fixes the symb_formula issue.
     This is a copy of the implementation with fixes for the uninitialized variable.
     """
-    logger = LLM_LEx.LLMLEx.logger
+    logger = llmlex.LLMLEx.logger
     logger.debug(f"Starting KAN to symbolic conversion with population={population}, generations={generations}")
     logger.debug(f"KAN model has {len(model.width_in)} layers")
 
@@ -103,12 +103,12 @@ def test_kan_to_symbolic(model, client, population=10, generations=3, temperatur
                     
                     # Generate plot
                     logger.info(f"Generating plot for connection ({l},{i},{j}) - this is what we're fitting.")
-                    fig, ax = LLM_LEx.LLMLEx.plt.subplots()
-                    LLM_LEx.LLMLEx.plt.xticks([x_min, x_max], ['%2.f' % x_min, '%2.f' % x_max])
-                    LLM_LEx.LLMLEx.plt.yticks([y_min, y_max], ['%2.f' % y_min, '%2.f' % y_max])
-                    base64_image = LLM_LEx.LLMLEx.generate_base64_image(fig, ax, x, y)
+                    fig, ax = llmlex.LLMLEx.plt.subplots()
+                    llmlex.LLMLEx.plt.xticks([x_min, x_max], ['%2.f' % x_min, '%2.f' % x_max])
+                    llmlex.LLMLEx.plt.yticks([y_min, y_max], ['%2.f' % y_min, '%2.f' % y_max])
+                    base64_image = llmlex.LLMLEx.generate_base64_image(fig, ax, x, y)
                     print((l,i,j))
-                    LLM_LEx.LLMLEx.plt.show()
+                    llmlex.LLMLEx.plt.show()
                     
                     # Get activation function mask
                     mask = model.act_fun[l].mask
@@ -116,7 +116,7 @@ def test_kan_to_symbolic(model, client, population=10, generations=3, temperatur
                     # Run genetic algorithm to find symbolic expression
                     try:
                         logger.info(f"Running genetic algorithm for connection ({l},{i},{j})")
-                        res = LLM_LEx.LLMLEx.run_genetic(
+                        res = llmlex.LLMLEx.run_genetic(
                             client, base64_image, x, y, population, generations, 
                             temperature=temperature, model=gpt_model, 
                             system_prompt=None, elite=False, 
@@ -135,7 +135,7 @@ def test_kan_to_symbolic(model, client, population=10, generations=3, temperatur
     logger.debug("Cleaning up matplotlib resources")
     try:
         ax.clear()
-        LLM_LEx.LLMLEx.plt.close()
+        llmlex.LLMLEx.plt.close()
     except:
         logger.debug("Could not clean up matplotlib resources - not a cause for concern")
     
@@ -195,13 +195,13 @@ class TestKANFunctionality(unittest.TestCase):
         self.mock_kan.fix_symbolic = MagicMock()
         
         # Create patches for the built-in functions that our test version of kan_to_symbolic uses
-        self.original_plt_subplots = LLM_LEx.LLMLEx.plt.subplots
-        self.original_plt_xticks = LLM_LEx.LLMLEx.plt.xticks
-        self.original_plt_yticks = LLM_LEx.LLMLEx.plt.yticks
-        self.original_plt_show = LLM_LEx.LLMLEx.plt.show
-        self.original_plt_close = LLM_LEx.LLMLEx.plt.close
-        self.original_generate_base64_image = LLM_LEx.LLMLEx.generate_base64_image
-        self.original_run_genetic = LLM_LEx.LLMLEx.run_genetic
+        self.original_plt_subplots = llmlex.LLMLEx.plt.subplots
+        self.original_plt_xticks = llmlex.LLMLEx.plt.xticks
+        self.original_plt_yticks = llmlex.LLMLEx.plt.yticks
+        self.original_plt_show = llmlex.LLMLEx.plt.show
+        self.original_plt_close = llmlex.LLMLEx.plt.close
+        self.original_generate_base64_image = llmlex.LLMLEx.generate_base64_image
+        self.original_run_genetic = llmlex.LLMLEx.run_genetic
         
         # Create the mocks we'll use
         self.mock_plt_subplots = MagicMock(return_value=(MagicMock(), MagicMock()))
@@ -221,24 +221,24 @@ class TestKANFunctionality(unittest.TestCase):
         
     def tearDown(self):
         # Restore the original functions
-        LLM_LEx.LLMLEx.plt.subplots = self.original_plt_subplots
-        LLM_LEx.LLMLEx.plt.xticks = self.original_plt_xticks
-        LLM_LEx.LLMLEx.plt.yticks = self.original_plt_yticks
-        LLM_LEx.LLMLEx.plt.show = self.original_plt_show
-        LLM_LEx.LLMLEx.plt.close = self.original_plt_close
-        LLM_LEx.LLMLEx.generate_base64_image = self.original_generate_base64_image
-        LLM_LEx.LLMLEx.run_genetic = self.original_run_genetic
+        llmlex.LLMLEx.plt.subplots = self.original_plt_subplots
+        llmlex.LLMLEx.plt.xticks = self.original_plt_xticks
+        llmlex.LLMLEx.plt.yticks = self.original_plt_yticks
+        llmlex.LLMLEx.plt.show = self.original_plt_show
+        llmlex.LLMLEx.plt.close = self.original_plt_close
+        llmlex.LLMLEx.generate_base64_image = self.original_generate_base64_image
+        llmlex.LLMLEx.run_genetic = self.original_run_genetic
 
     def test_kan_to_symbolic_basic(self):
         """Test basic functionality of kan_to_symbolic"""
         # Set the mock functions
-        LLM_LEx.LLMLEx.generate_base64_image = self.mock_generate_base64_image
-        LLM_LEx.LLMLEx.plt.subplots = self.mock_plt_subplots
-        LLM_LEx.LLMLEx.plt.xticks = self.mock_plt_xticks
-        LLM_LEx.LLMLEx.plt.yticks = self.mock_plt_yticks
-        LLM_LEx.LLMLEx.plt.show = self.mock_plt_show
-        LLM_LEx.LLMLEx.plt.close = self.mock_plt_close
-        LLM_LEx.LLMLEx.run_genetic = self.mock_run_genetic
+        llmlex.LLMLEx.generate_base64_image = self.mock_generate_base64_image
+        llmlex.LLMLEx.plt.subplots = self.mock_plt_subplots
+        llmlex.LLMLEx.plt.xticks = self.mock_plt_xticks
+        llmlex.LLMLEx.plt.yticks = self.mock_plt_yticks
+        llmlex.LLMLEx.plt.show = self.mock_plt_show
+        llmlex.LLMLEx.plt.close = self.mock_plt_close
+        llmlex.LLMLEx.run_genetic = self.mock_run_genetic
         
         # Setup a test case where there's at least one non-zero connection
         self.mock_kan.symbolic_fun[0].mask = np.zeros((3, 2))
@@ -268,13 +268,13 @@ class TestKANFunctionality(unittest.TestCase):
     def test_kan_to_symbolic_with_existing_symbolic(self):
         """Test kan_to_symbolic with existing symbolic connections"""
         # Set the mock functions
-        LLM_LEx.LLMLEx.generate_base64_image = self.mock_generate_base64_image
-        LLM_LEx.LLMLEx.plt.subplots = self.mock_plt_subplots
-        LLM_LEx.LLMLEx.plt.xticks = self.mock_plt_xticks
-        LLM_LEx.LLMLEx.plt.yticks = self.mock_plt_yticks
-        LLM_LEx.LLMLEx.plt.show = self.mock_plt_show
-        LLM_LEx.LLMLEx.plt.close = self.mock_plt_close
-        LLM_LEx.LLMLEx.run_genetic = self.mock_run_genetic
+        llmlex.LLMLEx.generate_base64_image = self.mock_generate_base64_image
+        llmlex.LLMLEx.plt.subplots = self.mock_plt_subplots
+        llmlex.LLMLEx.plt.xticks = self.mock_plt_xticks
+        llmlex.LLMLEx.plt.yticks = self.mock_plt_yticks
+        llmlex.LLMLEx.plt.show = self.mock_plt_show
+        llmlex.LLMLEx.plt.close = self.mock_plt_close
+        llmlex.LLMLEx.run_genetic = self.mock_run_genetic
         
         # Setup one connection as already symbolic
         self.mock_kan.symbolic_fun[0].mask = np.zeros((3, 2))
@@ -303,13 +303,13 @@ class TestKANFunctionality(unittest.TestCase):
     def test_kan_to_symbolic_with_zero_connections(self):
         """Test kan_to_symbolic with zero-valued connections"""
         # Set the mock functions
-        LLM_LEx.LLMLEx.generate_base64_image = self.mock_generate_base64_image
-        LLM_LEx.LLMLEx.plt.subplots = self.mock_plt_subplots
-        LLM_LEx.LLMLEx.plt.xticks = self.mock_plt_xticks
-        LLM_LEx.LLMLEx.plt.yticks = self.mock_plt_yticks
-        LLM_LEx.LLMLEx.plt.show = self.mock_plt_show
-        LLM_LEx.LLMLEx.plt.close = self.mock_plt_close
-        LLM_LEx.LLMLEx.run_genetic = self.mock_run_genetic
+        llmlex.LLMLEx.generate_base64_image = self.mock_generate_base64_image
+        llmlex.LLMLEx.plt.subplots = self.mock_plt_subplots
+        llmlex.LLMLEx.plt.xticks = self.mock_plt_xticks
+        llmlex.LLMLEx.plt.yticks = self.mock_plt_yticks
+        llmlex.LLMLEx.plt.show = self.mock_plt_show
+        llmlex.LLMLEx.plt.close = self.mock_plt_close
+        llmlex.LLMLEx.run_genetic = self.mock_run_genetic
         
         # Setup masks with zeros
         self.mock_kan.symbolic_fun[0].mask = np.zeros((3, 2))
@@ -337,13 +337,13 @@ class TestKANFunctionality(unittest.TestCase):
     def test_kan_to_symbolic_with_async(self):
         """Test kan_to_symbolic with async mode enabled"""
         # Set the mock functions
-        LLM_LEx.LLMLEx.generate_base64_image = self.mock_generate_base64_image
-        LLM_LEx.LLMLEx.plt.subplots = self.mock_plt_subplots
-        LLM_LEx.LLMLEx.plt.xticks = self.mock_plt_xticks
-        LLM_LEx.LLMLEx.plt.yticks = self.mock_plt_yticks
-        LLM_LEx.LLMLEx.plt.show = self.mock_plt_show
-        LLM_LEx.LLMLEx.plt.close = self.mock_plt_close
-        LLM_LEx.LLMLEx.run_genetic = self.mock_run_genetic
+        llmlex.LLMLEx.generate_base64_image = self.mock_generate_base64_image
+        llmlex.LLMLEx.plt.subplots = self.mock_plt_subplots
+        llmlex.LLMLEx.plt.xticks = self.mock_plt_xticks
+        llmlex.LLMLEx.plt.yticks = self.mock_plt_yticks
+        llmlex.LLMLEx.plt.show = self.mock_plt_show
+        llmlex.LLMLEx.plt.close = self.mock_plt_close
+        llmlex.LLMLEx.run_genetic = self.mock_run_genetic
         
         # Setup a test case where there's at least one non-zero connection to trigger run_genetic
         self.mock_kan.symbolic_fun[0].mask = np.zeros((3, 2))
@@ -371,12 +371,12 @@ class TestKANFunctionality(unittest.TestCase):
     def test_kan_to_symbolic_with_error_handling(self):
         """Test error handling in kan_to_symbolic"""
         # Set the mock functions except run_genetic (we'll create a special one)
-        LLM_LEx.LLMLEx.generate_base64_image = self.mock_generate_base64_image
-        LLM_LEx.LLMLEx.plt.subplots = self.mock_plt_subplots
-        LLM_LEx.LLMLEx.plt.xticks = self.mock_plt_xticks
-        LLM_LEx.LLMLEx.plt.yticks = self.mock_plt_yticks
-        LLM_LEx.LLMLEx.plt.show = self.mock_plt_show
-        LLM_LEx.LLMLEx.plt.close = self.mock_plt_close
+        llmlex.LLMLEx.generate_base64_image = self.mock_generate_base64_image
+        llmlex.LLMLEx.plt.subplots = self.mock_plt_subplots
+        llmlex.LLMLEx.plt.xticks = self.mock_plt_xticks
+        llmlex.LLMLEx.plt.yticks = self.mock_plt_yticks
+        llmlex.LLMLEx.plt.show = self.mock_plt_show
+        llmlex.LLMLEx.plt.close = self.mock_plt_close
         
         # Create a mock run_genetic that raises an exception on the second call
         call_count = [0]  # Use a list to maintain state across calls
@@ -395,8 +395,8 @@ class TestKANFunctionality(unittest.TestCase):
             ]
         
         error_mock = MagicMock(side_effect=side_effect)
-        original_run_genetic = LLM_LEx.LLMLEx.run_genetic
-        LLM_LEx.LLMLEx.run_genetic = error_mock
+        original_run_genetic = llmlex.LLMLEx.run_genetic
+        llmlex.LLMLEx.run_genetic = error_mock
         
         try:
             # Setup connections to ensure multiple calls to run_genetic
@@ -428,7 +428,7 @@ class TestKANFunctionality(unittest.TestCase):
             self.assertGreater(call_count[0], 1)
         finally:
             # Restore the original function
-            LLM_LEx.LLMLEx.run_genetic = original_run_genetic
+            llmlex.LLMLEx.run_genetic = original_run_genetic
 
 class TestKanSrFunctions(unittest.TestCase):
     """

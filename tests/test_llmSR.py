@@ -12,8 +12,8 @@ import tempfile
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-import LLM_LEx
-from LLM_LEx.LLMLEx import single_call, run_genetic, async_single_call
+import llmlex
+from llmlex.llmlex import single_call, run_genetic, async_single_call
 
 # Optional imports for real API tests
 try:
@@ -24,7 +24,7 @@ except ImportError:
 # Suppress logging during tests
 logging.getLogger().setLevel(logging.CRITICAL)
 
-class TestLLM_LEx(unittest.TestCase):
+class Testllmlex(unittest.TestCase):
     def setUp(self):
         """Set up test data for each test"""
         # Create simple test data 
@@ -36,7 +36,7 @@ class TestLLM_LEx(unittest.TestCase):
         ax.plot(self.x, self.y)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
-        self.base64_image = LLM_LEx.images.generate_base64_image(fig, ax, self.x, self.y)
+        self.base64_image = llmlex.images.generate_base64_image(fig, ax, self.x, self.y)
         plt.close(fig)
         
         # Create a mock client
@@ -69,10 +69,10 @@ class TestLLM_LEx(unittest.TestCase):
         
         # Instead of mocking lower-level call_model, mock at the highest level needed
         # This avoids issues with complex chained mocks
-        with patch('LLM_LEx.llmlex.call_model') as mock_call_model, \
-             patch('LLM_LEx.response.extract_ansatz') as mock_extract_ansatz, \
-             patch('LLM_LEx.response.fun_convert') as mock_fun_convert, \
-             patch('LLM_LEx.fit.fit_curve') as mock_fit_curve:
+        with patch('llmlex.llmlex.call_model') as mock_call_model, \
+             patch('llmlex.response.extract_ansatz') as mock_extract_ansatz, \
+             patch('llmlex.response.fun_convert') as mock_fun_convert, \
+             patch('llmlex.fit.fit_curve') as mock_fit_curve:
             
             # Set up the mocks with appropriate return values - need to mock formatted responses
             mock_call_model.return_value = """Based on the plot, I think the relationship can be modeled as:
@@ -121,10 +121,10 @@ This is a quadratic function that should fit the data well."""
         # Create async test function that patches the bare minimum of dependencies
         async def run_test():
             # Use all the needed patches
-            with patch('LLM_LEx.llmlex.async_call_model') as mock_async_call, \
-                 patch('LLM_LEx.response.extract_ansatz') as mock_extract_ansatz, \
-                 patch('LLM_LEx.response.fun_convert') as mock_fun_convert, \
-                 patch('LLM_LEx.fit.fit_curve') as mock_fit_curve:
+            with patch('llmlex.llmlex.async_call_model') as mock_async_call, \
+                 patch('llmlex.response.extract_ansatz') as mock_extract_ansatz, \
+                 patch('llmlex.response.fun_convert') as mock_fun_convert, \
+                 patch('llmlex.fit.fit_curve') as mock_fit_curve:
                 
                 # Configure all the mocks with appropriate return values that look like real API responses
                 mock_async_call.return_value = """Looking at the data plot, I can see this appears to be an oscillating function with decay.
@@ -220,7 +220,7 @@ This function captures both the oscillation and decay visible in the data."""
         
         try:
             # Patch only the external dependency
-            with patch('LLM_LEx.llmlex.async_single_call', side_effect=mock_async_single_call):
+            with patch('llmlex.llmlex.async_single_call', side_effect=mock_async_single_call):
                 # Run with minimal generations and population, default imports
                 result = run_genetic(
                     self.async_client, 
@@ -296,7 +296,7 @@ This function captures both the oscillation and decay visible in the data."""
         
         # Check initial usage
         try:
-            initial_usage = LLM_LEx.llm.check_key_limit(client)
+            initial_usage = llmlex.llm.check_key_limit(client)
         except Exception:
             # Skip if we can't check usage
             self.skipTest("Could not check API key limit - skipping real API test")
@@ -310,7 +310,7 @@ This function captures both the oscillation and decay visible in the data."""
         ax.scatter(x, y)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
-        base64_image = LLM_LEx.images.generate_base64_image(fig, ax, x, y)
+        base64_image = llmlex.images.generate_base64_image(fig, ax, x, y)
         plt.close(fig)
         
         # Run test with real API call
@@ -340,7 +340,7 @@ This function captures both the oscillation and decay visible in the data."""
             
             # Check final usage for reporting
             try:
-                final_usage = LLM_LEx.llm.check_key_limit(client)
+                final_usage = llmlex.llm.check_key_limit(client)
                 print(f"API test cost: ${np.round(final_usage - initial_usage, 3)}")
             except Exception:
                 pass
@@ -420,7 +420,7 @@ class TestGenetic(unittest.TestCase):
         
         try:
             # Mock async_single_call to return our test sequence
-            with patch('LLM_LEx.llmlex.async_single_call', side_effect=mock_api_call):
+            with patch('llmlex.llmlex.async_single_call', side_effect=mock_api_call):
                 # Run genetic algorithm with minimal settings 
                 result = run_genetic(
                     self.async_client,

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from LLM_LEx.response import extract_ansatz, fun_convert
+from llmlex.response import extract_ansatz, fun_convert
 
 class TestResponse(unittest.TestCase):
     def test_extract_ansatz_markdown_code_block(self):

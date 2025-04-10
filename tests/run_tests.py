@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Run tests for the LLM_LEx package.
+Run tests for the llmlex package.
 
 This script provides a convenient way to run the test suite with command line arguments
 to control which tests are run, including API tests and archived tests.
@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("LLM_LEx.tests")
+logger = logging.getLogger("llmlex.tests")
 
 # Load environment variables from .env file if it exists
 if os.path.exists('.env'):
@@ -78,7 +78,7 @@ def run_tests(no_api=False, run_archived=False):
 if __name__ == "__main__":
     # Parse any command line arguments
     import argparse
-    parser = argparse.ArgumentParser(description="Run LLM_LEx tests using pytest")
+    parser = argparse.ArgumentParser(description="Run llmlex tests using pytest")
     parser.add_argument('--no-api', action='store_true', help="Skip API tests")
     parser.add_argument('--run-archived', action='store_true', help="Run archived tests")
     parser.add_argument('--pytest-args', type=str, help="Additional arguments to pass to pytest")

@@ -13,11 +13,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("LLM_LEx.api_tests")
+logger = logging.getLogger("llmlex.api_tests")
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Run LLM_LEx tests with real API calls")
+    parser = argparse.ArgumentParser(description="Run llmlex tests with real API calls")
     parser.add_argument('--max-rate', type=int, help="Maximum API calls per minute")
     args = parser.parse_args()
     
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         
     # Set custom rate limit if provided
     if args.max_rate:
-        os.environ['LLM_LEx_TEST_MAX_CALLS_PER_MINUTE'] = str(args.max_rate)
+        os.environ['llmlex_TEST_MAX_CALLS_PER_MINUTE'] = str(args.max_rate)
         print(f"Setting maximum API call rate to {args.max_rate} calls per minute")
     
     # Import run_tests function from run_tests.py
