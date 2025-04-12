@@ -1922,15 +1922,22 @@ class KANLEX:
             
         original_formula = formula
         last_good_formula = formula
-        # Define symbolic variables and functions
-        if N > 1:
-            variables = symbols(f'x0:{N+1}')
-            safe_dict = {f'x{i}': variables[i] for i in range(N+1)}
-        else:
-            variables = symbols(f'x')
-            safe_dict = {f'x': variables}
 
-        used_functions = {name: self.numpy_to_sympy[name] for name in self.numpy_to_sympy if f'{name}' in formula}        
+        variables = symbols(f'x0:{N+1}')
+        used_functions = {name: self.numpy_to_sympy[name] for name in self.numpy_to_sympy if f'{name}' in formula}
+        safe_dict = {f'x{i}': variables[i] for i in range(N+1)}
+
+        # Define symbolic variables and functions
+        # if N > 1:
+        #     variables = symbols(f'x0:{N+1}')
+        #     safe_dict = {f'x{i}': variables[i] for i in range(N+1)}
+        # else:
+        #     variables = symbols(f'x')
+        #     safe_dict = {f'x': variables}
+
+        # used_functions = {name: self.numpy_to_sympy[name] for name in self.numpy_to_sympy if f'{name}' in formula}
+
+
         safe_dict.update(used_functions)  # Add only used symbolic functions
         safe_dict.update({'sp': sp})
         
@@ -2257,7 +2264,7 @@ def run_complete_pipeline(client, f, ranges=(-np.pi, np.pi), width=[1,4,1], grid
     if f is None:
         raise ValueError("Target function f must be provided")
     
-    kanlex = KAN_LEx(client=client, width=width, grid=grid, k=k, seed=seed, device=device)
+    kanlex = KANLEX(client=client, width=width, grid=grid, k=k, seed=seed, device=device)
     return kanlex.run_complete_pipeline(
         client=client, f=f, ranges=ranges,
         train_steps=train_steps, generations=generations, gpt_model=gpt_model,
