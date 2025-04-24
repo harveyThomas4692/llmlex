@@ -14,19 +14,22 @@ def generate_test_data():
     # Simple polynomial: 2x^2 + 3x + 5
     y = 2 * x**2 + 3 * x + 5
     
+    # Get current directory
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
     # Save the data
-    np.savez('tests/test_data/test_data.npz', x=x, y=y)
+    np.savez(os.path.join(current_dir, 'test_data.npz'), x=x, y=y)
     
     # Generate and save a test image
     fig, ax = plt.subplots()
     base64_image = generate_base64_image(fig, ax, x, y)
     
     # Save the base64 image to a file
-    with open('tests/test_data/test_image.txt', 'w') as f:
+    with open(os.path.join(current_dir, 'test_image.txt'), 'w') as f:
         f.write(base64_image)
     
     # Save the plot image for reference
-    plt.savefig('tests/test_data/test_plot.png')
+    plt.savefig(os.path.join(current_dir, 'test_plot.png'))
     plt.close(fig)
     
     return x, y, base64_image
