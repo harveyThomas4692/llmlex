@@ -2,7 +2,7 @@ import logging
 import os
 
 # Configure logging
-logger = logging.getLogger("llmlex")
+logger = logging.getLogger("LLMLEx")
 logger.setLevel(logging.INFO)
 
 # Create console handler
@@ -17,7 +17,7 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 # Allow log level to be set via environment variable
-log_level = os.environ.get('llmlex_LOG_LEVEL', 'INFO').upper()
+log_level = os.environ.get('LLMLEX_LOG_LEVEL', 'INFO').upper()
 if log_level in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
     logger.setLevel(getattr(logging, log_level))
 

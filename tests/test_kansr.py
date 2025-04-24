@@ -298,7 +298,7 @@ class TestKANLExClass(unittest.TestCase):
         self.kansr.training_history = {'train_loss': torch.tensor([0.001])}
         
         # Only mock the external API calls
-        with patch('llmlex.llmLEx.kan_to_symbolic') as mock_kan_to_symbolic, \
+        with patch('llmlex.llmlex.kan_to_symbolic') as mock_kan_to_symbolic, \
              patch('llmlex.llm.check_key_usage') as mock_check_key_usage:
             
             # Setup mock returns for the external API
@@ -681,7 +681,7 @@ class TestKANLExClass(unittest.TestCase):
     def test_run_complete_pipeline(self):
         """Test the complete pipeline functionality."""
         # Mock essential external API calls
-        with patch('llmlex.llmLEx.kan_to_symbolic') as mock_kan_to_symbolic, \
+        with patch('llmlex.llmlex.kan_to_symbolic') as mock_kan_to_symbolic, \
              patch('llmlex.llm.check_key_usage') as mock_check_key_usage:
             
             # Set up mock returns

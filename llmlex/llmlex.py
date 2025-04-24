@@ -23,7 +23,7 @@ except ImportError:
     nest_asyncio_available = False
 
 # Get module logger
-logger = logging.getLogger("llmlex.llmlex")
+logger = logging.getLogger("LLMLEx.llmlex")
 
 # Helper function to execute a coroutine in a way that works with any event loop state
 async def _run_in_nested_loop(coro):
