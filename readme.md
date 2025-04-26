@@ -1,3 +1,4 @@
+![](logo.png)
 # Large Lange Models Learning Expressions (LLM_LEx)
 LLM_LEx is a Python library for symbolic regression using vision-capable Large Language Models. It finds mathematical formulae to fit your data by visualizing them as graphs and using LLMs to suggest equations.
 
