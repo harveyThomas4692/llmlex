@@ -1,6 +1,8 @@
 # Large Lange Models Learning Expressions (LLM-LEx)
 LLM-LEx is a Python library for symbolic regression using vision-capable Large Language Models. It finds mathematical formulae to fit your data by visualizing them as graphs and using LLMs to suggest equations.
 
+See our paper for further details: \<ArXiv link when available\>
+
 ![](logo.png)
 
 Our custom scoring function is a robust, approximately scale-invariant "normalized chi-squared" that handles both large and small values gracefully. Note that it isn't exactly scale invariance, because we actually (do/may) not want complete scale invariance. If the mean and MAD are close to zero, the score normalises by a small epsilon instead. This is so that functions that are approximately zero can be well-modelled by a fit which is simply zero.
