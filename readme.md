@@ -33,6 +33,8 @@ Or for development:
 pip install -e .
 ```
 
+Many examples can be found in the example folders
+
 ## Basic Usage
 
 ```python
@@ -81,68 +83,17 @@ llmlex can be used to extract interpretable symbolic expressions from trained KA
 import torch
 from kan import KAN, create_dataset
 
-# Train a KAN model (simple example)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = KAN(width=[2,1,1,1], grid=7, k=3, seed=0, device=device)
+# initialize KAN with G=3
+model = KAN(width=[2,1,1,1], grid=7, k=3, seed=0, device=device, symbolic_enabled=False)
 
-# Create dataset
-f = lambda x: torch.exp(torch.sin(torch.pi*x[:,[0]]) + x[:,[1]]**2) # should be a torch function
-#Initialize a KANLEX instance for the multivariate function
-multivariate_kansr = KANLEX(
-    client=client,
-    width=[2,5,1 1],  # 2 inputs, 5 hidden nodes, 1 output
-    grid=5,
-    k=3,
-    seed=42
-)
-# Create a dataset for the multivariate function
-multivariate_dataset = multivariate_kansr.create_dataset(
-    f=multivariate_function,
-    ranges=(-3, 3),  # Same range for both variables
-    n_var=2,  # Two input variables
-    train_num=10000,
-    test_num=1000
-)
+# create dataset
+f = lambda x: torch.exp(torch.sin(torch.pi*x[:,[0]]) + x[:,[1]]**2)
+dataset = create_dataset(f, n_var=2, train_num=10000, test_num=1000, device=device)
+res = model.fit(dataset, opt="LBFGS", steps=100);
 
-# Convert to symbolic expressions
-best_expressions, best_chi_squareds, results_dicts, results_all_dicts = multivariate_kansr.get_symbolic(
-    client=client,
-    population=10,
-    generations=5,
-    temperature=0.1,
-    gpt_model="openai/gpt-4o",
-    verbose=1,
-    use_async=True,
-    plot_fit=True,
-    plot_parents=True,
-    demonstrate_parent_plotting=True,
-    train_steps=500
-)
-```
+# run llmlex on each edge
 
-`KANLEX.generate_learned_f_function` finds the symbolic expression expressed as a python program, but does not simplify the expression. For that, use `optimise_expression` in the KANSR class, or `run_complete_pipeline` for a complete end-to-end pipeline.
-
-For a complete end-to-end symbolic regression pipeline using KANs, use the `run_complete_pipeline` function, or see the example notebook `Examples/kanlex_example.ipynb`.
-
-```python
-# Complete KAN-SR Pipeline
-# Run the complete pipeline with custom parameters
-results = llmlex.KANLEX.run_complete_pipeline(
-    client, f,
-    ranges=x_range,
-    width=[1, 4, 1],  # Use a wider network for this more complex function
-    grid=7,
-    k=3,
-    train_steps=500,  # More training steps
-    gpt_model="openai/gpt-4o",
-    node_th=0.1,      # More conservative pruning
-    edge_th=0.1,
-    custom_system_prompt_for_second_simplification=system_prompt_for_second_simplification,
-    generations = 3,
-    population=10,
-    plot_parents=True,
-    demonstrate_parent_plotting=True
-)
+sym_expr = llmlex.kan_to_symbolic(model, client, gpt_model="openai/gpt-4o", exit_condition=min(res['train_loss']).item(), use_async=True, population=10, generations=3, temperature=0.1)#
 
 ```
 
