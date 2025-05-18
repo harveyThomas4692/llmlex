@@ -95,6 +95,21 @@ res = model.fit(dataset, opt="LBFGS", steps=100);
 
 sym_expr = llmlex.kan_to_symbolic(model, client, gpt_model="openai/gpt-4o", exit_condition=min(res['train_loss']).item(), use_async=True, population=10, generations=3, temperature=0.1)#
 
+best_expressions, best_chi_squareds, results_dicts, results_all_dicts = multivariate_kansr.get_symbolic(
+    client=client,
+    population=5,
+    generations=2,
+    temperature=0.1,
+    gpt_model="openai/gpt-4o",
+    verbose=1,
+    use_async=True,
+    plot_fit=True,
+    plot_parents=True,
+    demonstrate_parent_plotting=True
+)
+
+print(best_expressions, best_chi_squareds)
+
 ```
 
 ## Running Tests
